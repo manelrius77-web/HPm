@@ -97,9 +97,7 @@ export default function Index() {
   const [kerf, setKerf] = useState('3');
 
   // Pieces state
-  const [pieces, setPieces] = useState<Piece[]>([
-    { id: '1', name: 'Pieza 1', length: '', width: '', quantity: '0', canRotate: false, edgedLong: 0, edgedShort: 0 },
-  ]);
+  const [pieces, setPieces] = useState<Piece[]>([]);
 
   // Result state
   const [result, setResult] = useState<CutResult | null>(null);
@@ -142,9 +140,7 @@ export default function Index() {
   };
 
   const removePiece = (id: string) => {
-    if (pieces.length > 1) {
-      setPieces(pieces.filter(p => p.id !== id));
-    }
+    setPieces(pieces.filter(p => p.id !== id));
   };
 
   const updatePiece = (id: string, field: keyof Piece, value: string | boolean | number) => {
@@ -319,7 +315,7 @@ export default function Index() {
     setBoardLength('2440');
     setBoardWidth('1220');
     setKerf('3');
-    setPieces([{ id: '1', name: 'Pieza 1', length: '', width: '', quantity: '0', canRotate: false, edgedLong: 0, edgedShort: 0 }]);
+    setPieces([]);
     setCurrentProjectId(null);
     setProjectName('');
     setResult(null);
@@ -458,14 +454,12 @@ export default function Index() {
                 placeholder={`Pieza ${index + 1}`}
                 placeholderTextColor="#666"
               />
-              {pieces.length > 1 && (
-                <TouchableOpacity
-                  style={styles.removeButton}
-                  onPress={() => removePiece(piece.id)}
-                >
-                  <Ionicons name="close-circle" size={24} color="#F44336" />
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={styles.removeButton}
+                onPress={() => removePiece(piece.id)}
+              >
+                <Ionicons name="close-circle" size={24} color="#F44336" />
+              </TouchableOpacity>
             </View>
             
             <View style={styles.pieceInputs}>
