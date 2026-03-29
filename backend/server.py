@@ -35,6 +35,7 @@ class Piece(BaseModel):
     length: float  # mm
     width: float   # mm
     quantity: int = 1
+    can_rotate: bool = True  # False = respect grain direction (veta)
 
 class Board(BaseModel):
     """Board/panel dimensions"""
@@ -75,6 +76,38 @@ class CutResult(BaseModel):
     unplaced_pieces: List[dict] = []
 
 # =====================
+# PROJECT MODELS (for saving)
+# =====================
+
+class ProjectPiece(BaseModel):
+    """Piece data for saving in project"""
+    id: str
+    name: str
+    length: float
+    width: float
+    quantity: int
+    can_rotate: bool = True
+
+class ProjectCreate(BaseModel):
+    """Create a new project"""
+    name: str
+    board_length: float
+    board_width: float
+    kerf: float = 3.0
+    pieces: List[ProjectPiece]
+
+class Project(BaseModel):
+    """Saved project"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    board_length: float
+    board_width: float
+    kerf: float
+    pieces: List[ProjectPiece]
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+# =====================
 # CUTTING ALGORITHM
 # =====================
 
@@ -88,7 +121,7 @@ class GuillotineBinPacker:
         self.free_rectangles = [(0, 0, width, height)]  # (x, y, w, h)
         self.placed_pieces = []
     
-    def find_best_fit(self, piece_w: float, piece_h: float):
+    def find_best_fit(self, piece_w: float, piece_h: float, can_rotate: bool = True):
         """Find the best free rectangle to place the piece"""
         best_rect = None
         best_idx = -1
@@ -105,8 +138,8 @@ class GuillotineBinPacker:
                     best_idx = idx
                     rotated = False
             
-            # Try rotated orientation
-            if piece_h <= rw and piece_w <= rh:
+            # Try rotated orientation only if allowed (respects grain direction)
+            if can_rotate and piece_h <= rw and piece_w <= rh:
                 score = min(rw - piece_h, rh - piece_w)
                 if score < best_score:
                     best_score = score
@@ -136,9 +169,9 @@ class GuillotineBinPacker:
         if top_h > self.kerf:  # Only if meaningful space
             self.free_rectangles.append((rx, ry + ph_with_kerf, piece_w, top_h))
     
-    def place_piece(self, piece_id: str, name: str, piece_w: float, piece_h: float) -> Optional[PlacedPiece]:
+    def place_piece(self, piece_id: str, name: str, piece_w: float, piece_h: float, can_rotate: bool = True) -> Optional[PlacedPiece]:
         """Try to place a piece on this board"""
-        best_rect, best_idx, rotated = self.find_best_fit(piece_w, piece_h)
+        best_rect, best_idx, rotated = self.find_best_fit(piece_w, piece_h, can_rotate)
         
         if best_rect is None:
             return None
@@ -187,7 +220,8 @@ def optimize_cutting(request: CutRequest) -> CutResult:
                 'name': piece.name,
                 'length': piece.length,
                 'width': piece.width,
-                'area': piece.length * piece.width
+                'area': piece.length * piece.width,
+                'can_rotate': piece.can_rotate
             })
     
     # Sort by area descending (FFD - First Fit Decreasing)
@@ -203,7 +237,7 @@ def optimize_cutting(request: CutRequest) -> CutResult:
         # Try to place on existing boards
         for board_packer in boards:
             result = board_packer.place_piece(
-                piece['id'], piece['name'], piece['length'], piece['width']
+                piece['id'], piece['name'], piece['length'], piece['width'], piece['can_rotate']
             )
             if result:
                 placed = True
@@ -213,7 +247,7 @@ def optimize_cutting(request: CutRequest) -> CutResult:
         if not placed:
             new_board = GuillotineBinPacker(board.length, board.width, kerf)
             result = new_board.place_piece(
-                piece['id'], piece['name'], piece['length'], piece['width']
+                piece['id'], piece['name'], piece['length'], piece['width'], piece['can_rotate']
             )
             if result:
                 boards.append(new_board)
@@ -293,6 +327,91 @@ async def optimize_cut(request: CutRequest):
 @api_router.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "wood-cutting-optimizer"}
+
+# =====================
+# PROJECT CRUD ROUTES
+# =====================
+
+@api_router.post("/projects", response_model=Project)
+async def create_project(project: ProjectCreate):
+    """Save a new project"""
+    try:
+        project_obj = Project(
+            name=project.name,
+            board_length=project.board_length,
+            board_width=project.board_width,
+            kerf=project.kerf,
+            pieces=[ProjectPiece(**p.dict()) for p in project.pieces]
+        )
+        await db.projects.insert_one(project_obj.dict())
+        return project_obj
+    except Exception as e:
+        logging.error(f"Error creating project: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al guardar proyecto: {str(e)}")
+
+@api_router.get("/projects", response_model=List[Project])
+async def get_projects():
+    """Get all saved projects"""
+    try:
+        projects = await db.projects.find().sort("updated_at", -1).to_list(100)
+        return [Project(**p) for p in projects]
+    except Exception as e:
+        logging.error(f"Error fetching projects: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al obtener proyectos: {str(e)}")
+
+@api_router.get("/projects/{project_id}", response_model=Project)
+async def get_project(project_id: str):
+    """Get a specific project by ID"""
+    try:
+        project = await db.projects.find_one({"id": project_id})
+        if not project:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+        return Project(**project)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error fetching project: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al obtener proyecto: {str(e)}")
+
+@api_router.put("/projects/{project_id}", response_model=Project)
+async def update_project(project_id: str, project: ProjectCreate):
+    """Update an existing project"""
+    try:
+        existing = await db.projects.find_one({"id": project_id})
+        if not existing:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+        
+        updated_data = {
+            "name": project.name,
+            "board_length": project.board_length,
+            "board_width": project.board_width,
+            "kerf": project.kerf,
+            "pieces": [p.dict() for p in project.pieces],
+            "updated_at": datetime.utcnow()
+        }
+        
+        await db.projects.update_one({"id": project_id}, {"$set": updated_data})
+        updated_project = await db.projects.find_one({"id": project_id})
+        return Project(**updated_project)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error updating project: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al actualizar proyecto: {str(e)}")
+
+@api_router.delete("/projects/{project_id}")
+async def delete_project(project_id: str):
+    """Delete a project"""
+    try:
+        result = await db.projects.delete_one({"id": project_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+        return {"message": "Proyecto eliminado correctamente"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error deleting project: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al eliminar proyecto: {str(e)}")
 
 # Include the router in the main app
 app.include_router(api_router)

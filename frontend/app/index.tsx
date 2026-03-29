@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,9 @@ import {
   Platform,
   KeyboardAvoidingView,
   Dimensions,
+  Switch,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -26,6 +29,7 @@ interface Piece {
   length: string;
   width: string;
   quantity: string;
+  canRotate: boolean;
 }
 
 interface PlacedPiece {
@@ -55,6 +59,24 @@ interface CutResult {
   unplaced_pieces: { name: string; length: number; width: number; reason: string }[];
 }
 
+interface SavedProject {
+  id: string;
+  name: string;
+  board_length: number;
+  board_width: number;
+  kerf: number;
+  pieces: {
+    id: string;
+    name: string;
+    length: number;
+    width: number;
+    quantity: number;
+    can_rotate: boolean;
+  }[];
+  created_at: string;
+  updated_at: string;
+}
+
 // Color palette for pieces
 const PIECE_COLORS = [
   '#4CAF50', '#2196F3', '#FF9800', '#E91E63', '#9C27B0',
@@ -70,17 +92,47 @@ export default function Index() {
 
   // Pieces state
   const [pieces, setPieces] = useState<Piece[]>([
-    { id: '1', name: 'Pieza 1', length: '600', width: '400', quantity: '2' },
+    { id: '1', name: 'Pieza 1', length: '600', width: '400', quantity: '2', canRotate: true },
   ]);
 
   // Result state
   const [result, setResult] = useState<CutResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'input' | 'result'>('input');
+  const [activeTab, setActiveTab] = useState<'input' | 'result' | 'projects'>('input');
+
+  // Projects state
+  const [projects, setProjects] = useState<SavedProject[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [saveModalVisible, setSaveModalVisible] = useState(false);
+  const [projectName, setProjectName] = useState('');
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [savingProject, setSavingProject] = useState(false);
+
+  // Load projects on mount
+  useEffect(() => {
+    if (activeTab === 'projects') {
+      loadProjects();
+    }
+  }, [activeTab]);
+
+  const loadProjects = async () => {
+    setLoadingProjects(true);
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/projects`);
+      if (response.ok) {
+        const data = await response.json();
+        setProjects(data);
+      }
+    } catch (error) {
+      console.error('Error loading projects:', error);
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
 
   const addPiece = () => {
     const newId = String(Date.now());
-    setPieces([...pieces, { id: newId, name: `Pieza ${pieces.length + 1}`, length: '', width: '', quantity: '1' }]);
+    setPieces([...pieces, { id: newId, name: `Pieza ${pieces.length + 1}`, length: '', width: '', quantity: '1', canRotate: true }]);
   };
 
   const removePiece = (id: string) => {
@@ -89,7 +141,7 @@ export default function Index() {
     }
   };
 
-  const updatePiece = (id: string, field: keyof Piece, value: string) => {
+  const updatePiece = (id: string, field: keyof Piece, value: string | boolean) => {
     setPieces(pieces.map(p => p.id === id ? { ...p, [field]: value } : p));
   };
 
@@ -119,6 +171,7 @@ export default function Index() {
           length: parseFloat(p.length),
           width: parseFloat(p.width),
           quantity: parseInt(p.quantity) || 1,
+          can_rotate: p.canRotate,
         })),
         kerf: parseFloat(kerf) || 3,
       };
@@ -144,6 +197,121 @@ export default function Index() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const saveProject = async () => {
+    if (!projectName.trim()) {
+      Alert.alert('Error', 'Ingresa un nombre para el proyecto');
+      return;
+    }
+
+    setSavingProject(true);
+    try {
+      const projectData = {
+        name: projectName.trim(),
+        board_length: parseFloat(boardLength) || 2440,
+        board_width: parseFloat(boardWidth) || 1220,
+        kerf: parseFloat(kerf) || 3,
+        pieces: pieces.map(p => ({
+          id: p.id,
+          name: p.name || 'Sin nombre',
+          length: parseFloat(p.length) || 0,
+          width: parseFloat(p.width) || 0,
+          quantity: parseInt(p.quantity) || 1,
+          can_rotate: p.canRotate,
+        })),
+      };
+
+      let response;
+      if (currentProjectId) {
+        // Update existing project
+        response = await fetch(`${BACKEND_URL}/api/projects/${currentProjectId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(projectData),
+        });
+      } else {
+        // Create new project
+        response = await fetch(`${BACKEND_URL}/api/projects`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(projectData),
+        });
+      }
+
+      if (response.ok) {
+        const savedProject = await response.json();
+        setCurrentProjectId(savedProject.id);
+        setSaveModalVisible(false);
+        Alert.alert('Éxito', 'Proyecto guardado correctamente');
+        loadProjects();
+      } else {
+        throw new Error('Error al guardar');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo guardar el proyecto');
+    } finally {
+      setSavingProject(false);
+    }
+  };
+
+  const loadProject = (project: SavedProject) => {
+    setBoardLength(String(project.board_length));
+    setBoardWidth(String(project.board_width));
+    setKerf(String(project.kerf));
+    setPieces(project.pieces.map(p => ({
+      id: p.id,
+      name: p.name,
+      length: String(p.length),
+      width: String(p.width),
+      quantity: String(p.quantity),
+      canRotate: p.can_rotate,
+    })));
+    setCurrentProjectId(project.id);
+    setProjectName(project.name);
+    setResult(null);
+    setActiveTab('input');
+  };
+
+  const deleteProject = async (projectId: string) => {
+    Alert.alert(
+      'Eliminar proyecto',
+      '¿Estás seguro de que quieres eliminar este proyecto?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const response = await fetch(`${BACKEND_URL}/api/projects/${projectId}`, {
+                method: 'DELETE',
+              });
+              if (response.ok) {
+                if (currentProjectId === projectId) {
+                  setCurrentProjectId(null);
+                  setProjectName('');
+                }
+                loadProjects();
+              }
+            } catch (error) {
+              Alert.alert('Error', 'No se pudo eliminar el proyecto');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const newProject = () => {
+    setBoardLength('2440');
+    setBoardWidth('1220');
+    setKerf('3');
+    setPieces([{ id: '1', name: 'Pieza 1', length: '', width: '', quantity: '1', canRotate: true }]);
+    setCurrentProjectId(null);
+    setProjectName('');
+    setResult(null);
+    setActiveTab('input');
   };
 
   const renderBoardDiagram = (layout: BoardLayout, index: number) => {
@@ -205,6 +373,17 @@ export default function Index() {
 
   const renderInputTab = () => (
     <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      {/* Current Project Info */}
+      {currentProjectId && (
+        <View style={styles.currentProjectBanner}>
+          <Ionicons name="folder-open" size={18} color="#4CAF50" />
+          <Text style={styles.currentProjectText}>{projectName}</Text>
+          <TouchableOpacity onPress={newProject}>
+            <Ionicons name="add-circle-outline" size={22} color="#888" />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Board Settings */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
@@ -312,6 +491,26 @@ export default function Index() {
                 />
               </View>
             </View>
+
+            {/* Rotation toggle */}
+            <View style={styles.rotationRow}>
+              <View style={styles.rotationInfo}>
+                <Ionicons 
+                  name={piece.canRotate ? "sync" : "lock-closed"} 
+                  size={16} 
+                  color={piece.canRotate ? "#4CAF50" : "#FF9800"} 
+                />
+                <Text style={styles.rotationLabel}>
+                  {piece.canRotate ? 'Puede rotar' : 'Veta fija (no rotar)'}
+                </Text>
+              </View>
+              <Switch
+                value={piece.canRotate}
+                onValueChange={(value) => updatePiece(piece.id, 'canRotate', value)}
+                trackColor={{ false: '#3d3d3d', true: '#1b5e20' }}
+                thumbColor={piece.canRotate ? '#4CAF50' : '#FF9800'}
+              />
+            </View>
           </View>
         ))}
 
@@ -321,21 +520,36 @@ export default function Index() {
         </TouchableOpacity>
       </View>
 
-      {/* Calculate Button */}
-      <TouchableOpacity
-        style={[styles.calculateButton, loading && styles.calculateButtonDisabled]}
-        onPress={calculateCut}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <>
-            <Ionicons name="calculator" size={24} color="#fff" />
-            <Text style={styles.calculateButtonText}>Calcular Despiece</Text>
-          </>
-        )}
-      </TouchableOpacity>
+      {/* Action Buttons */}
+      <View style={styles.actionButtons}>
+        <TouchableOpacity
+          style={styles.saveButton}
+          onPress={() => {
+            if (!projectName && !currentProjectId) {
+              setProjectName('');
+            }
+            setSaveModalVisible(true);
+          }}
+        >
+          <Ionicons name="save-outline" size={22} color="#2196F3" />
+          <Text style={styles.saveButtonText}>Guardar</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.calculateButton, loading && styles.calculateButtonDisabled]}
+          onPress={calculateCut}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="calculator" size={22} color="#fff" />
+              <Text style={styles.calculateButtonText}>Calcular</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
       
       <View style={styles.bottomSpacer} />
     </ScrollView>
@@ -400,6 +614,7 @@ export default function Index() {
                   <View style={[styles.legendColor, { backgroundColor: PIECE_COLORS[index % PIECE_COLORS.length] }]} />
                   <Text style={styles.legendText}>
                     {piece.name}: {piece.length}x{piece.width}mm (x{piece.quantity})
+                    {!piece.canRotate && ' 🔒'}
                   </Text>
                 </View>
               ))}
@@ -415,6 +630,60 @@ export default function Index() {
       
       <View style={styles.bottomSpacer} />
     </ScrollView>
+  );
+
+  const renderProjectsTab = () => (
+    <View style={styles.projectsContainer}>
+      {loadingProjects ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+        </View>
+      ) : projects.length === 0 ? (
+        <View style={styles.emptyProjects}>
+          <Ionicons name="folder-open-outline" size={64} color="#444" />
+          <Text style={styles.emptyProjectsText}>No hay proyectos guardados</Text>
+          <Text style={styles.emptyProjectsSubtext}>Guarda tu primer proyecto desde la pestaña de entrada</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={projects}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.projectsList}
+          renderItem={({ item }) => (
+            <TouchableOpacity 
+              style={[
+                styles.projectCard,
+                currentProjectId === item.id && styles.projectCardActive
+              ]}
+              onPress={() => loadProject(item)}
+            >
+              <View style={styles.projectInfo}>
+                <Text style={styles.projectName}>{item.name}</Text>
+                <Text style={styles.projectDetails}>
+                  Tablero: {item.board_length}x{item.board_width}mm
+                </Text>
+                <Text style={styles.projectDetails}>
+                  {item.pieces.length} tipo(s) de pieza • Kerf: {item.kerf}mm
+                </Text>
+                <Text style={styles.projectDate}>
+                  {new Date(item.updated_at).toLocaleDateString('es-ES', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  })}
+                </Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.deleteProjectButton}
+                onPress={() => deleteProject(item.id)}
+              >
+                <Ionicons name="trash-outline" size={22} color="#F44336" />
+              </TouchableOpacity>
+            </TouchableOpacity>
+          )}
+        />
+      )}
+    </View>
   );
 
   return (
@@ -455,14 +724,72 @@ export default function Index() {
             Resultado
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'projects' && styles.activeTab]}
+          onPress={() => setActiveTab('projects')}
+        >
+          <Ionicons 
+            name="folder-outline" 
+            size={20} 
+            color={activeTab === 'projects' ? '#4CAF50' : '#888'} 
+          />
+          <Text style={[styles.tabText, activeTab === 'projects' && styles.activeTabText]}>
+            Proyectos
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <KeyboardAvoidingView 
         style={styles.content}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {activeTab === 'input' ? renderInputTab() : renderResultTab()}
+        {activeTab === 'input' && renderInputTab()}
+        {activeTab === 'result' && renderResultTab()}
+        {activeTab === 'projects' && renderProjectsTab()}
       </KeyboardAvoidingView>
+
+      {/* Save Modal */}
+      <Modal
+        visible={saveModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSaveModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {currentProjectId ? 'Actualizar Proyecto' : 'Guardar Proyecto'}
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              value={projectName}
+              onChangeText={setProjectName}
+              placeholder="Nombre del proyecto"
+              placeholderTextColor="#666"
+              autoFocus
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setSaveModalVisible(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSaveButton, savingProject && styles.modalSaveButtonDisabled]}
+                onPress={saveProject}
+                disabled={savingProject}
+              >
+                {savingProject ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.modalSaveText}>Guardar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -498,16 +825,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderRadius: 12,
     backgroundColor: '#1e1e1e',
-    gap: 6,
+    gap: 4,
   },
   activeTab: {
     backgroundColor: '#1b3a1b',
   },
   tabText: {
-    fontSize: 15,
+    fontSize: 13,
     color: '#888',
     fontWeight: '500',
   },
@@ -520,6 +847,21 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
     paddingHorizontal: 16,
+  },
+  currentProjectBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1b3a1b',
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 12,
+    gap: 8,
+  },
+  currentProjectText: {
+    flex: 1,
+    color: '#4CAF50',
+    fontSize: 14,
+    fontWeight: '500',
   },
   section: {
     marginTop: 20,
@@ -604,6 +946,24 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#fff',
   },
+  rotationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+  },
+  rotationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rotationLabel: {
+    fontSize: 13,
+    color: '#aaa',
+  },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -620,21 +980,43 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     fontWeight: '500',
   },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 24,
+  },
+  saveButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1e1e1e',
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2196F3',
+    gap: 8,
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2196F3',
+  },
   calculateButton: {
+    flex: 2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#4CAF50',
     paddingVertical: 16,
     borderRadius: 12,
-    marginTop: 24,
-    gap: 10,
+    gap: 8,
   },
   calculateButtonDisabled: {
     opacity: 0.6,
   },
   calculateButtonText: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '600',
     color: '#fff',
   },
@@ -774,5 +1156,131 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 16,
     textAlign: 'center',
+  },
+  projectsContainer: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyProjects: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  emptyProjectsText: {
+    fontSize: 18,
+    color: '#666',
+    marginTop: 16,
+  },
+  emptyProjectsSubtext: {
+    fontSize: 14,
+    color: '#555',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  projectsList: {
+    padding: 16,
+  },
+  projectCard: {
+    flexDirection: 'row',
+    backgroundColor: '#1e1e1e',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  projectCardActive: {
+    borderColor: '#4CAF50',
+    backgroundColor: '#1b3a1b',
+  },
+  projectInfo: {
+    flex: 1,
+  },
+  projectName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  projectDetails: {
+    fontSize: 13,
+    color: '#888',
+    marginBottom: 2,
+  },
+  projectDate: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  deleteProjectButton: {
+    padding: 8,
+    justifyContent: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: '#1e1e1e',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 340,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  modalInput: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#fff',
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#444',
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    color: '#888',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  modalSaveButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: '#4CAF50',
+    alignItems: 'center',
+  },
+  modalSaveButtonDisabled: {
+    opacity: 0.6,
+  },
+  modalSaveText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
