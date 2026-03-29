@@ -35,7 +35,8 @@ class Piece(BaseModel):
     length: float  # mm
     width: float   # mm
     quantity: int = 1
-    can_rotate: bool = True  # False = respect grain direction (veta)
+    can_rotate: bool = False  # Default: respect grain direction (veta)
+    edged_sides: int = 0  # Number of sides with edge banding (canteado): 0, 1, 2, 3, 4
 
 class Board(BaseModel):
     """Board/panel dimensions"""
@@ -86,7 +87,8 @@ class ProjectPiece(BaseModel):
     length: float
     width: float
     quantity: int
-    can_rotate: bool = True
+    can_rotate: bool = False
+    edged_sides: int = 0  # Number of edged sides (canteado)
 
 class ProjectCreate(BaseModel):
     """Create a new project"""

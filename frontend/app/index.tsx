@@ -30,6 +30,7 @@ interface Piece {
   width: string;
   quantity: string;
   canRotate: boolean;
+  edgedSides: number; // 0, 1, 2, 3, 4 lados canteados
 }
 
 interface PlacedPiece {
@@ -72,6 +73,7 @@ interface SavedProject {
     width: number;
     quantity: number;
     can_rotate: boolean;
+    edged_sides: number;
   }[];
   created_at: string;
   updated_at: string;
@@ -92,7 +94,7 @@ export default function Index() {
 
   // Pieces state
   const [pieces, setPieces] = useState<Piece[]>([
-    { id: '1', name: 'Pieza 1', length: '600', width: '400', quantity: '2', canRotate: true },
+    { id: '1', name: 'Pieza 1', length: '600', width: '400', quantity: '2', canRotate: false, edgedSides: 0 },
   ]);
 
   // Result state
@@ -132,7 +134,7 @@ export default function Index() {
 
   const addPiece = () => {
     const newId = String(Date.now());
-    setPieces([...pieces, { id: newId, name: `Pieza ${pieces.length + 1}`, length: '', width: '', quantity: '1', canRotate: true }]);
+    setPieces([...pieces, { id: newId, name: `Pieza ${pieces.length + 1}`, length: '', width: '', quantity: '1', canRotate: false, edgedSides: 0 }]);
   };
 
   const removePiece = (id: string) => {
@@ -141,7 +143,7 @@ export default function Index() {
     }
   };
 
-  const updatePiece = (id: string, field: keyof Piece, value: string | boolean) => {
+  const updatePiece = (id: string, field: keyof Piece, value: string | boolean | number) => {
     setPieces(pieces.map(p => p.id === id ? { ...p, [field]: value } : p));
   };
 
@@ -172,6 +174,7 @@ export default function Index() {
           width: parseFloat(p.width),
           quantity: parseInt(p.quantity) || 1,
           can_rotate: p.canRotate,
+          edged_sides: p.edgedSides,
         })),
         kerf: parseFloat(kerf) || 3,
       };
@@ -219,6 +222,7 @@ export default function Index() {
           width: parseFloat(p.width) || 0,
           quantity: parseInt(p.quantity) || 1,
           can_rotate: p.canRotate,
+          edged_sides: p.edgedSides,
         })),
       };
 
@@ -266,6 +270,7 @@ export default function Index() {
       width: String(p.width),
       quantity: String(p.quantity),
       canRotate: p.can_rotate,
+      edgedSides: p.edged_sides || 0,
     })));
     setCurrentProjectId(project.id);
     setProjectName(project.name);
@@ -307,7 +312,7 @@ export default function Index() {
     setBoardLength('2440');
     setBoardWidth('1220');
     setKerf('3');
-    setPieces([{ id: '1', name: 'Pieza 1', length: '', width: '', quantity: '1', canRotate: true }]);
+    setPieces([{ id: '1', name: 'Pieza 1', length: '', width: '', quantity: '1', canRotate: false, edgedSides: 0 }]);
     setCurrentProjectId(null);
     setProjectName('');
     setResult(null);
@@ -507,9 +512,34 @@ export default function Index() {
               <Switch
                 value={piece.canRotate}
                 onValueChange={(value) => updatePiece(piece.id, 'canRotate', value)}
-                trackColor={{ false: '#3d3d3d', true: '#1b5e20' }}
-                thumbColor={piece.canRotate ? '#4CAF50' : '#FF9800'}
+                trackColor={{ false: '#1b5e20', true: '#3d3d3d' }}
+                thumbColor={piece.canRotate ? '#888' : '#FF9800'}
               />
+            </View>
+
+            {/* Edged sides selector */}
+            <View style={styles.edgedRow}>
+              <View style={styles.edgedInfo}>
+                <Ionicons name="square-outline" size={16} color="#2196F3" />
+                <Text style={styles.edgedLabel}>Lados canteados:</Text>
+              </View>
+              <View style={styles.edgedSelector}>
+                {[0, 1, 2, 3, 4].map((num) => (
+                  <TouchableOpacity
+                    key={num}
+                    style={[
+                      styles.edgedButton,
+                      piece.edgedSides === num && styles.edgedButtonActive
+                    ]}
+                    onPress={() => updatePiece(piece.id, 'edgedSides', num)}
+                  >
+                    <Text style={[
+                      styles.edgedButtonText,
+                      piece.edgedSides === num && styles.edgedButtonTextActive
+                    ]}>{num}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           </View>
         ))}
@@ -614,7 +644,8 @@ export default function Index() {
                   <View style={[styles.legendColor, { backgroundColor: PIECE_COLORS[index % PIECE_COLORS.length] }]} />
                   <Text style={styles.legendText}>
                     {piece.name}: {piece.length}x{piece.width}mm (x{piece.quantity})
-                    {!piece.canRotate && ' 🔒'}
+                    {!piece.canRotate && ' | Veta fija'}
+                    {piece.edgedSides > 0 && ` | ${piece.edgedSides} canto${piece.edgedSides > 1 ? 's' : ''}`}
                   </Text>
                 </View>
               ))}
@@ -963,6 +994,47 @@ const styles = StyleSheet.create({
   rotationLabel: {
     fontSize: 13,
     color: '#aaa',
+  },
+  edgedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  edgedInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  edgedLabel: {
+    fontSize: 13,
+    color: '#aaa',
+  },
+  edgedSelector: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  edgedButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#2a2a2a',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  edgedButtonActive: {
+    backgroundColor: '#1565C0',
+    borderColor: '#2196F3',
+  },
+  edgedButtonText: {
+    fontSize: 14,
+    color: '#888',
+    fontWeight: '600',
+  },
+  edgedButtonTextActive: {
+    color: '#fff',
   },
   addButton: {
     flexDirection: 'row',
