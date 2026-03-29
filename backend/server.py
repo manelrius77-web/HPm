@@ -302,7 +302,7 @@ def optimize_cutting(request: CutRequest) -> CutResult:
         total_edge_mm += info['edged_long'] * length
         total_edge_mm += info['edged_short'] * width
     
-    total_edge_meters = round(total_edge_mm / 1000, 2)
+    total_edge_meters = round(total_edge_mm / 100, 2)  # cm to meters
     
     # Calculate total cuts (each placed piece needs cuts to separate it)
     total_cuts = sum(len(b.placed_pieces) for b in boards)

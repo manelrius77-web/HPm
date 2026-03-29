@@ -92,9 +92,9 @@ const PIECE_COLORS = [
 
 export default function Index() {
   // Board state
-  const [boardLength, setBoardLength] = useState('2440');
-  const [boardWidth, setBoardWidth] = useState('1220');
-  const [kerf, setKerf] = useState('3');
+  const [boardLength, setBoardLength] = useState('244');
+  const [boardWidth, setBoardWidth] = useState('122');
+  const [kerf, setKerf] = useState('0.3');
 
   // Pieces state
   const [pieces, setPieces] = useState<Piece[]>([]);
@@ -312,9 +312,9 @@ export default function Index() {
   };
 
   const newProject = () => {
-    setBoardLength('2440');
-    setBoardWidth('1220');
-    setKerf('3');
+    setBoardLength('244');
+    setBoardWidth('122');
+    setKerf('0.3');
     setPieces([]);
     setCurrentProjectId(null);
     setProjectName('');
@@ -362,7 +362,7 @@ export default function Index() {
                   {piece.name}
                 </Text>
                 <Text style={styles.pieceDimensions}>
-                  {piece.length}x{piece.width}
+                  {piece.length}x{piece.width}cm
                 </Text>
                 {piece.rotated && (
                   <Ionicons name="sync" size={12} color="#fff" style={styles.rotatedIcon} />
@@ -373,7 +373,7 @@ export default function Index() {
         </View>
         
         <Text style={styles.boardDimensions}>
-          {layout.board_length} x {layout.board_width} mm
+          {layout.board_length} x {layout.board_width} cm
         </Text>
       </View>
     );
@@ -401,37 +401,37 @@ export default function Index() {
         
         <View style={styles.inputRow}>
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Largo (mm)</Text>
+            <Text style={styles.inputLabel}>Largo (cm)</Text>
             <TextInput
               style={styles.input}
               value={boardLength}
               onChangeText={setBoardLength}
               keyboardType="numeric"
-              placeholder="2440"
+              placeholder="244"
               placeholderTextColor="#666"
             />
           </View>
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Ancho (mm)</Text>
+            <Text style={styles.inputLabel}>Ancho (cm)</Text>
             <TextInput
               style={styles.input}
               value={boardWidth}
               onChangeText={setBoardWidth}
               keyboardType="numeric"
-              placeholder="1220"
+              placeholder="122"
               placeholderTextColor="#666"
             />
           </View>
         </View>
         
         <View style={styles.inputGroupFull}>
-          <Text style={styles.inputLabel}>Grosor de corte - Kerf (mm)</Text>
+          <Text style={styles.inputLabel}>Grosor de corte - Kerf (cm)</Text>
           <TextInput
             style={styles.input}
             value={kerf}
             onChangeText={setKerf}
             keyboardType="numeric"
-            placeholder="3"
+            placeholder="0.3"
             placeholderTextColor="#666"
           />
         </View>
@@ -464,24 +464,24 @@ export default function Index() {
             
             <View style={styles.pieceInputs}>
               <View style={styles.pieceInputGroup}>
-                <Text style={styles.pieceInputLabel}>Largo</Text>
+                <Text style={styles.pieceInputLabel}>Largo (cm)</Text>
                 <TextInput
                   style={styles.pieceInput}
                   value={piece.length}
                   onChangeText={(text) => updatePiece(piece.id, 'length', text)}
                   keyboardType="numeric"
-                  placeholder="mm"
+                  placeholder="cm"
                   placeholderTextColor="#666"
                 />
               </View>
               <View style={styles.pieceInputGroup}>
-                <Text style={styles.pieceInputLabel}>Ancho</Text>
+                <Text style={styles.pieceInputLabel}>Ancho (cm)</Text>
                 <TextInput
                   style={styles.pieceInput}
                   value={piece.width}
                   onChangeText={(text) => updatePiece(piece.id, 'width', text)}
                   keyboardType="numeric"
-                  placeholder="mm"
+                  placeholder="cm"
                   placeholderTextColor="#666"
                 />
               </View>
@@ -678,7 +678,7 @@ export default function Index() {
                   <View style={[styles.legendColor, { backgroundColor: PIECE_COLORS[index % PIECE_COLORS.length] }]} />
                   <View style={styles.legendTextContainer}>
                     <Text style={styles.legendText}>
-                      {piece.name}: {piece.length}x{piece.width}mm (x{piece.quantity})
+                      {piece.name}: {piece.length}x{piece.width}cm (x{piece.quantity})
                     </Text>
                     <Text style={styles.legendSubtext}>
                       {!piece.canRotate ? 'Veta fija' : 'Rotable'}
@@ -730,10 +730,10 @@ export default function Index() {
               <View style={styles.projectInfo}>
                 <Text style={styles.projectName}>{item.name}</Text>
                 <Text style={styles.projectDetails}>
-                  Tablero: {item.board_length}x{item.board_width}mm
+                  Tablero: {item.board_length}x{item.board_width}cm
                 </Text>
                 <Text style={styles.projectDetails}>
-                  {item.pieces.length} tipo(s) de pieza • Kerf: {item.kerf}mm
+                  {item.pieces.length} tipo(s) de pieza • Kerf: {item.kerf}cm
                 </Text>
                 <Text style={styles.projectDate}>
                   {new Date(item.updated_at).toLocaleDateString('es-ES', {
