@@ -98,7 +98,7 @@ export default function Index() {
 
   // Pieces state
   const [pieces, setPieces] = useState<Piece[]>([
-    { id: '1', name: 'Pieza 1', length: '600', width: '400', quantity: '2', canRotate: false, edgedLong: 0, edgedShort: 0 },
+    { id: '1', name: 'Pieza 1', length: '', width: '', quantity: '0', canRotate: false, edgedLong: 0, edgedShort: 0 },
   ]);
 
   // Result state
@@ -138,7 +138,7 @@ export default function Index() {
 
   const addPiece = () => {
     const newId = String(Date.now());
-    setPieces([...pieces, { id: newId, name: `Pieza ${pieces.length + 1}`, length: '', width: '', quantity: '1', canRotate: false, edgedLong: 0, edgedShort: 0 }]);
+    setPieces([...pieces, { id: newId, name: `Pieza ${pieces.length + 1}`, length: '', width: '', quantity: '0', canRotate: false, edgedLong: 0, edgedShort: 0 }]);
   };
 
   const removePiece = (id: string) => {
@@ -319,7 +319,7 @@ export default function Index() {
     setBoardLength('2440');
     setBoardWidth('1220');
     setKerf('3');
-    setPieces([{ id: '1', name: 'Pieza 1', length: '', width: '', quantity: '1', canRotate: false, edgedLong: 0, edgedShort: 0 }]);
+    setPieces([{ id: '1', name: 'Pieza 1', length: '', width: '', quantity: '0', canRotate: false, edgedLong: 0, edgedShort: 0 }]);
     setCurrentProjectId(null);
     setProjectName('');
     setResult(null);
