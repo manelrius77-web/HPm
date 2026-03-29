@@ -36,7 +36,8 @@ class Piece(BaseModel):
     width: float   # mm
     quantity: int = 1
     can_rotate: bool = False  # Default: respect grain direction (veta)
-    edged_sides: int = 0  # Number of sides with edge banding (canteado): 0, 1, 2, 3, 4
+    edged_long: int = 0  # Number of long sides with edge banding (0, 1, 2)
+    edged_short: int = 0  # Number of short sides with edge banding (0, 1, 2)
 
 class Board(BaseModel):
     """Board/panel dimensions"""
@@ -75,6 +76,8 @@ class CutResult(BaseModel):
     pieces_placed: int
     waste_percentage: float
     unplaced_pieces: List[dict] = []
+    total_cuts: int = 0  # Total number of cuts needed
+    total_edge_meters: float = 0.0  # Total meters of edge banding needed
 
 # =====================
 # PROJECT MODELS (for saving)
@@ -88,7 +91,8 @@ class ProjectPiece(BaseModel):
     width: float
     quantity: int
     can_rotate: bool = False
-    edged_sides: int = 0  # Number of edged sides (canteado)
+    edged_long: int = 0  # Long sides with edge banding
+    edged_short: int = 0  # Short sides with edge banding
 
 class ProjectCreate(BaseModel):
     """Create a new project"""
@@ -213,12 +217,23 @@ def optimize_cutting(request: CutRequest) -> CutResult:
     board = request.board
     kerf = request.kerf
     
+    # Build piece lookup for edge banding calculation
+    piece_edge_info = {}
+    for piece in request.pieces:
+        piece_edge_info[piece.id] = {
+            'length': piece.length,
+            'width': piece.width,
+            'edged_long': piece.edged_long,
+            'edged_short': piece.edged_short
+        }
+    
     # Expand pieces by quantity and sort by area (largest first)
     expanded_pieces = []
     for piece in request.pieces:
         for i in range(piece.quantity):
             expanded_pieces.append({
                 'id': f"{piece.id}_{i}",
+                'original_id': piece.id,
                 'name': piece.name,
                 'length': piece.length,
                 'width': piece.width,
@@ -232,6 +247,7 @@ def optimize_cutting(request: CutRequest) -> CutResult:
     total_pieces = len(expanded_pieces)
     boards: List[GuillotineBinPacker] = []
     unplaced = []
+    placed_pieces_info = []  # Track placed pieces for edge calculation
     
     for piece in expanded_pieces:
         placed = False
@@ -243,6 +259,10 @@ def optimize_cutting(request: CutRequest) -> CutResult:
             )
             if result:
                 placed = True
+                placed_pieces_info.append({
+                    'original_id': piece['original_id'],
+                    'rotated': result.rotated
+                })
                 break
         
         # If not placed, create a new board
@@ -254,6 +274,10 @@ def optimize_cutting(request: CutRequest) -> CutResult:
             if result:
                 boards.append(new_board)
                 placed = True
+                placed_pieces_info.append({
+                    'original_id': piece['original_id'],
+                    'rotated': result.rotated
+                })
             else:
                 # Piece is too large for the board
                 unplaced.append({
@@ -262,6 +286,26 @@ def optimize_cutting(request: CutRequest) -> CutResult:
                     'width': piece['width'],
                     'reason': 'Pieza demasiado grande para el tablero'
                 })
+    
+    # Calculate total edge banding meters
+    total_edge_mm = 0
+    for placed in placed_pieces_info:
+        info = piece_edge_info[placed['original_id']]
+        length = info['length']
+        width = info['width']
+        
+        # If rotated, swap dimensions for edge calculation
+        if placed['rotated']:
+            length, width = width, length
+        
+        # Add edge banding: long sides use length, short sides use width
+        total_edge_mm += info['edged_long'] * length
+        total_edge_mm += info['edged_short'] * width
+    
+    total_edge_meters = round(total_edge_mm / 1000, 2)
+    
+    # Calculate total cuts (each placed piece needs cuts to separate it)
+    total_cuts = sum(len(b.placed_pieces) for b in boards)
     
     # Build result
     board_layouts = []
@@ -289,7 +333,9 @@ def optimize_cutting(request: CutRequest) -> CutResult:
         total_pieces=total_pieces,
         pieces_placed=pieces_placed,
         waste_percentage=round(waste_percentage, 1),
-        unplaced_pieces=unplaced
+        unplaced_pieces=unplaced,
+        total_cuts=total_cuts,
+        total_edge_meters=total_edge_meters
     )
 
 # =====================

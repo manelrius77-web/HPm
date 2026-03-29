@@ -30,7 +30,8 @@ interface Piece {
   width: string;
   quantity: string;
   canRotate: boolean;
-  edgedSides: number; // 0, 1, 2, 3, 4 lados canteados
+  edgedLong: number; // 0, 1, 2 cantos en lados largos
+  edgedShort: number; // 0, 1, 2 cantos en lados cortos
 }
 
 interface PlacedPiece {
@@ -58,6 +59,8 @@ interface CutResult {
   pieces_placed: number;
   waste_percentage: number;
   unplaced_pieces: { name: string; length: number; width: number; reason: string }[];
+  total_cuts: number;
+  total_edge_meters: number;
 }
 
 interface SavedProject {
@@ -73,7 +76,8 @@ interface SavedProject {
     width: number;
     quantity: number;
     can_rotate: boolean;
-    edged_sides: number;
+    edged_long: number;
+    edged_short: number;
   }[];
   created_at: string;
   updated_at: string;
@@ -94,7 +98,7 @@ export default function Index() {
 
   // Pieces state
   const [pieces, setPieces] = useState<Piece[]>([
-    { id: '1', name: 'Pieza 1', length: '600', width: '400', quantity: '2', canRotate: false, edgedSides: 0 },
+    { id: '1', name: 'Pieza 1', length: '600', width: '400', quantity: '2', canRotate: false, edgedLong: 0, edgedShort: 0 },
   ]);
 
   // Result state
@@ -134,7 +138,7 @@ export default function Index() {
 
   const addPiece = () => {
     const newId = String(Date.now());
-    setPieces([...pieces, { id: newId, name: `Pieza ${pieces.length + 1}`, length: '', width: '', quantity: '1', canRotate: false, edgedSides: 0 }]);
+    setPieces([...pieces, { id: newId, name: `Pieza ${pieces.length + 1}`, length: '', width: '', quantity: '1', canRotate: false, edgedLong: 0, edgedShort: 0 }]);
   };
 
   const removePiece = (id: string) => {
@@ -174,7 +178,8 @@ export default function Index() {
           width: parseFloat(p.width),
           quantity: parseInt(p.quantity) || 1,
           can_rotate: p.canRotate,
-          edged_sides: p.edgedSides,
+          edged_long: p.edgedLong,
+          edged_short: p.edgedShort,
         })),
         kerf: parseFloat(kerf) || 3,
       };
@@ -222,7 +227,8 @@ export default function Index() {
           width: parseFloat(p.width) || 0,
           quantity: parseInt(p.quantity) || 1,
           can_rotate: p.canRotate,
-          edged_sides: p.edgedSides,
+          edged_long: p.edgedLong,
+          edged_short: p.edgedShort,
         })),
       };
 
@@ -270,7 +276,8 @@ export default function Index() {
       width: String(p.width),
       quantity: String(p.quantity),
       canRotate: p.can_rotate,
-      edgedSides: p.edged_sides || 0,
+      edgedLong: p.edged_long || 0,
+      edgedShort: p.edged_short || 0,
     })));
     setCurrentProjectId(project.id);
     setProjectName(project.name);
@@ -312,7 +319,7 @@ export default function Index() {
     setBoardLength('2440');
     setBoardWidth('1220');
     setKerf('3');
-    setPieces([{ id: '1', name: 'Pieza 1', length: '', width: '', quantity: '1', canRotate: false, edgedSides: 0 }]);
+    setPieces([{ id: '1', name: 'Pieza 1', length: '', width: '', quantity: '1', canRotate: false, edgedLong: 0, edgedShort: 0 }]);
     setCurrentProjectId(null);
     setProjectName('');
     setResult(null);
@@ -520,22 +527,44 @@ export default function Index() {
             {/* Edged sides selector */}
             <View style={styles.edgedRow}>
               <View style={styles.edgedInfo}>
-                <Ionicons name="square-outline" size={16} color="#2196F3" />
-                <Text style={styles.edgedLabel}>Lados canteados:</Text>
+                <Text style={styles.edgedLabel}>Cantos largo:</Text>
               </View>
               <View style={styles.edgedSelector}>
-                {[0, 1, 2, 3, 4].map((num) => (
+                {[0, 1, 2].map((num) => (
                   <TouchableOpacity
                     key={num}
                     style={[
                       styles.edgedButton,
-                      piece.edgedSides === num && styles.edgedButtonActive
+                      piece.edgedLong === num && styles.edgedButtonActive
                     ]}
-                    onPress={() => updatePiece(piece.id, 'edgedSides', num)}
+                    onPress={() => updatePiece(piece.id, 'edgedLong', num)}
                   >
                     <Text style={[
                       styles.edgedButtonText,
-                      piece.edgedSides === num && styles.edgedButtonTextActive
+                      piece.edgedLong === num && styles.edgedButtonTextActive
+                    ]}>{num}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.edgedRow}>
+              <View style={styles.edgedInfo}>
+                <Text style={styles.edgedLabel}>Cantos ancho:</Text>
+              </View>
+              <View style={styles.edgedSelector}>
+                {[0, 1, 2].map((num) => (
+                  <TouchableOpacity
+                    key={num}
+                    style={[
+                      styles.edgedButton,
+                      piece.edgedShort === num && styles.edgedButtonActive
+                    ]}
+                    onPress={() => updatePiece(piece.id, 'edgedShort', num)}
+                  >
+                    <Text style={[
+                      styles.edgedButtonText,
+                      piece.edgedShort === num && styles.edgedButtonTextActive
                     ]}>{num}</Text>
                   </TouchableOpacity>
                 ))}
@@ -592,21 +621,32 @@ export default function Index() {
           {/* Summary */}
           <View style={styles.summarySection}>
             <View style={styles.summaryCard}>
-              <Ionicons name="layers" size={32} color="#4CAF50" />
+              <Ionicons name="layers" size={28} color="#4CAF50" />
               <Text style={styles.summaryNumber}>{result.total_boards}</Text>
               <Text style={styles.summaryLabel}>Tableros</Text>
             </View>
             <View style={styles.summaryCard}>
-              <Ionicons name="grid" size={32} color="#2196F3" />
-              <Text style={styles.summaryNumber}>{result.pieces_placed}</Text>
-              <Text style={styles.summaryLabel}>Piezas</Text>
+              <Ionicons name="cut-outline" size={28} color="#FF9800" />
+              <Text style={styles.summaryNumber}>{result.total_cuts}</Text>
+              <Text style={styles.summaryLabel}>Cortes</Text>
             </View>
             <View style={styles.summaryCard}>
-              <Ionicons name="trash-outline" size={32} color="#FF9800" />
+              <Ionicons name="trash-outline" size={28} color="#F44336" />
               <Text style={styles.summaryNumber}>{result.waste_percentage}%</Text>
               <Text style={styles.summaryLabel}>Desperdicio</Text>
             </View>
           </View>
+
+          {/* Edge banding summary */}
+          {result.total_edge_meters > 0 && (
+            <View style={styles.edgeSummary}>
+              <Ionicons name="resize-outline" size={24} color="#2196F3" />
+              <View style={styles.edgeSummaryContent}>
+                <Text style={styles.edgeSummaryTitle}>Canto necesario</Text>
+                <Text style={styles.edgeSummaryValue}>{result.total_edge_meters} metros</Text>
+              </View>
+            </View>
+          )}
 
           {/* Unplaced pieces warning */}
           {result.unplaced_pieces.length > 0 && (
@@ -642,11 +682,16 @@ export default function Index() {
               {pieces.filter(p => p.length && p.width).map((piece, index) => (
                 <View key={piece.id} style={styles.legendItem}>
                   <View style={[styles.legendColor, { backgroundColor: PIECE_COLORS[index % PIECE_COLORS.length] }]} />
-                  <Text style={styles.legendText}>
-                    {piece.name}: {piece.length}x{piece.width}mm (x{piece.quantity})
-                    {!piece.canRotate && ' | Veta fija'}
-                    {piece.edgedSides > 0 && ` | ${piece.edgedSides} canto${piece.edgedSides > 1 ? 's' : ''}`}
-                  </Text>
+                  <View style={styles.legendTextContainer}>
+                    <Text style={styles.legendText}>
+                      {piece.name}: {piece.length}x{piece.width}mm (x{piece.quantity})
+                    </Text>
+                    <Text style={styles.legendSubtext}>
+                      {!piece.canRotate ? 'Veta fija' : 'Rotable'}
+                      {(piece.edgedLong > 0 || piece.edgedShort > 0) && 
+                        ` | Cantos: ${piece.edgedLong}L ${piece.edgedShort}A`}
+                    </Text>
+                  </View>
                 </View>
               ))}
             </View>
@@ -1119,6 +1164,27 @@ const styles = StyleSheet.create({
     color: '#888',
     marginTop: 4,
   },
+  edgeSummary: {
+    flexDirection: 'row',
+    backgroundColor: '#1a237e',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 12,
+    alignItems: 'center',
+    gap: 12,
+  },
+  edgeSummaryContent: {
+    flex: 1,
+  },
+  edgeSummaryTitle: {
+    fontSize: 14,
+    color: '#90CAF9',
+  },
+  edgeSummaryValue: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
   warningSection: {
     flexDirection: 'row',
     backgroundColor: '#3d1f1f',
@@ -1216,6 +1282,14 @@ const styles = StyleSheet.create({
   legendText: {
     fontSize: 14,
     color: '#ccc',
+  },
+  legendTextContainer: {
+    flex: 1,
+  },
+  legendSubtext: {
+    fontSize: 11,
+    color: '#888',
+    marginTop: 2,
   },
   emptyResult: {
     flex: 1,
