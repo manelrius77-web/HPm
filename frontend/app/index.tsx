@@ -120,6 +120,9 @@ export default function Index() {
   const [calculatorValue, setCalculatorValue] = useState('');
   const [calculatorTarget, setCalculatorTarget] = useState<{pieceId: string; field: 'length' | 'width' | 'quantity'} | null>(null);
 
+  // Export options state
+  const [exportOptionsVisible, setExportOptionsVisible] = useState(false);
+
   // Scroll ref
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -191,111 +194,123 @@ export default function Index() {
   };
 
   // Export to PDF function
-  const exportToPDF = async () => {
+  const generatePDFHtml = () => {
+    if (!result) return '';
+
+    const piecesHtml = pieces.filter(p => p.length && p.width).map((piece, index) => `
+      <tr>
+        <td style="padding: 8px; border: 1px solid #ddd;">${piece.name}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${piece.length} x ${piece.width} cm</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${piece.quantity}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${piece.canRotate ? 'Sí' : 'No'}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">${piece.edgedLong}L / ${piece.edgedShort}A</td>
+      </tr>
+    `).join('');
+
+    const boardsHtml = result.board_layouts.map(layout => `
+      <div style="margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px;">
+        <h3 style="margin: 0 0 10px 0;">Tablero ${layout.board_number}</h3>
+        <p><strong>Dimensiones:</strong> ${layout.board_length} x ${layout.board_width} cm</p>
+        <p><strong>Aprovechamiento:</strong> ${layout.utilization.toFixed(1)}%</p>
+        <p><strong>Piezas:</strong></p>
+        <ul>
+          ${layout.pieces.map(p => `<li>${p.name}: ${p.length}x${p.width}cm en posición (${p.x.toFixed(1)}, ${p.y.toFixed(1)})${p.rotated ? ' - Rotada' : ''}</li>`).join('')}
+        </ul>
+      </div>
+    `).join('');
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Despiece de Corte</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { color: #4CAF50; }
+          .summary { display: flex; gap: 20px; margin: 20px 0; }
+          .summary-card { background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center; flex: 1; }
+          .summary-number { font-size: 28px; font-weight: bold; color: #333; }
+          .summary-label { color: #666; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          th { background: #4CAF50; color: white; padding: 10px; text-align: left; }
+        </style>
+      </head>
+      <body>
+        <h1>Optimizador de Corte - Despiece</h1>
+        
+        <h2>Resumen</h2>
+        <div class="summary">
+          <div class="summary-card">
+            <div class="summary-number">${result.total_boards}</div>
+            <div class="summary-label">Tableros</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-number">${result.total_cuts}</div>
+            <div class="summary-label">Cortes</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-number">${result.waste_percentage}%</div>
+            <div class="summary-label">Desperdicio</div>
+          </div>
+          ${result.total_edge_meters > 0 ? `
+          <div class="summary-card">
+            <div class="summary-number">${result.total_edge_meters}m</div>
+            <div class="summary-label">Canto</div>
+          </div>
+          ` : ''}
+        </div>
+
+        <h2>Tablero Base</h2>
+        <p><strong>Dimensiones:</strong> ${boardLength} x ${boardWidth} cm</p>
+        <p><strong>Grosor de corte (kerf):</strong> ${kerf} cm</p>
+
+        <h2>Lista de Piezas</h2>
+        <table>
+          <tr>
+            <th>Nombre</th>
+            <th>Dimensiones</th>
+            <th>Cantidad</th>
+            <th>Rotable</th>
+            <th>Cantos</th>
+          </tr>
+          ${piecesHtml}
+        </table>
+
+        <h2>Distribución por Tablero</h2>
+        ${boardsHtml}
+
+        <p style="margin-top: 30px; color: #888; font-size: 12px;">
+          Generado el ${new Date().toLocaleDateString('es-ES')} a las ${new Date().toLocaleTimeString('es-ES')}
+        </p>
+      </body>
+      </html>
+    `;
+  };
+
+  const exportToPDF = async (action: 'share' | 'print') => {
     if (!result) return;
 
     try {
-      const piecesHtml = pieces.filter(p => p.length && p.width).map((piece, index) => `
-        <tr>
-          <td style="padding: 8px; border: 1px solid #ddd;">${piece.name}</td>
-          <td style="padding: 8px; border: 1px solid #ddd;">${piece.length} x ${piece.width} cm</td>
-          <td style="padding: 8px; border: 1px solid #ddd;">${piece.quantity}</td>
-          <td style="padding: 8px; border: 1px solid #ddd;">${piece.canRotate ? 'Sí' : 'No'}</td>
-          <td style="padding: 8px; border: 1px solid #ddd;">${piece.edgedLong}L / ${piece.edgedShort}A</td>
-        </tr>
-      `).join('');
-
-      const boardsHtml = result.board_layouts.map(layout => `
-        <div style="margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px;">
-          <h3 style="margin: 0 0 10px 0;">Tablero ${layout.board_number}</h3>
-          <p><strong>Dimensiones:</strong> ${layout.board_length} x ${layout.board_width} cm</p>
-          <p><strong>Aprovechamiento:</strong> ${layout.utilization.toFixed(1)}%</p>
-          <p><strong>Piezas:</strong></p>
-          <ul>
-            ${layout.pieces.map(p => `<li>${p.name}: ${p.length}x${p.width}cm en posición (${p.x.toFixed(1)}, ${p.y.toFixed(1)})${p.rotated ? ' - Rotada' : ''}</li>`).join('')}
-          </ul>
-        </div>
-      `).join('');
-
-      const html = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <title>Despiece de Corte</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            h1 { color: #4CAF50; }
-            .summary { display: flex; gap: 20px; margin: 20px 0; }
-            .summary-card { background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center; flex: 1; }
-            .summary-number { font-size: 28px; font-weight: bold; color: #333; }
-            .summary-label { color: #666; }
-            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-            th { background: #4CAF50; color: white; padding: 10px; text-align: left; }
-          </style>
-        </head>
-        <body>
-          <h1>Optimizador de Corte - Despiece</h1>
-          
-          <h2>Resumen</h2>
-          <div class="summary">
-            <div class="summary-card">
-              <div class="summary-number">${result.total_boards}</div>
-              <div class="summary-label">Tableros</div>
-            </div>
-            <div class="summary-card">
-              <div class="summary-number">${result.total_cuts}</div>
-              <div class="summary-label">Cortes</div>
-            </div>
-            <div class="summary-card">
-              <div class="summary-number">${result.waste_percentage}%</div>
-              <div class="summary-label">Desperdicio</div>
-            </div>
-            ${result.total_edge_meters > 0 ? `
-            <div class="summary-card">
-              <div class="summary-number">${result.total_edge_meters}m</div>
-              <div class="summary-label">Canto</div>
-            </div>
-            ` : ''}
-          </div>
-
-          <h2>Tablero Base</h2>
-          <p><strong>Dimensiones:</strong> ${boardLength} x ${boardWidth} cm</p>
-          <p><strong>Grosor de corte (kerf):</strong> ${kerf} cm</p>
-
-          <h2>Lista de Piezas</h2>
-          <table>
-            <tr>
-              <th>Nombre</th>
-              <th>Dimensiones</th>
-              <th>Cantidad</th>
-              <th>Rotable</th>
-              <th>Cantos</th>
-            </tr>
-            ${piecesHtml}
-          </table>
-
-          <h2>Distribución por Tablero</h2>
-          ${boardsHtml}
-
-          <p style="margin-top: 30px; color: #888; font-size: 12px;">
-            Generado el ${new Date().toLocaleDateString('es-ES')} a las ${new Date().toLocaleTimeString('es-ES')}
-          </p>
-        </body>
-        </html>
-      `;
-
-      const { uri } = await Print.printToFileAsync({ html });
+      const html = generatePDFHtml();
       
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'application/pdf',
-          dialogTitle: 'Exportar Despiece',
-          UTI: 'com.adobe.pdf'
-        });
+      if (action === 'print') {
+        await Print.printAsync({ html });
       } else {
-        Alert.alert('PDF Generado', `Archivo guardado en: ${uri}`);
+        const { uri } = await Print.printToFileAsync({ html });
+        
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri, {
+            mimeType: 'application/pdf',
+            dialogTitle: 'Exportar Despiece',
+            UTI: 'com.adobe.pdf'
+          });
+        } else {
+          Alert.alert('PDF Generado', `Archivo guardado en: ${uri}`);
+        }
       }
+      
+      setExportOptionsVisible(false);
     } catch (error) {
       console.error('Error exporting PDF:', error);
       Alert.alert('Error', 'No se pudo generar el PDF');
@@ -630,46 +645,32 @@ export default function Index() {
               </TouchableOpacity>
             </View>
             
-            <View style={styles.pieceInputs}>
-              <View style={styles.pieceInputGroup}>
+            <View style={styles.pieceInputRow}>
+              <View style={styles.pieceInputHalf}>
                 <Text style={styles.pieceInputLabel}>Largo (cm)</Text>
-                <View style={styles.inputWithCalc}>
-                  <TextInput
-                    style={styles.pieceInputWithButton}
-                    value={piece.length}
-                    onChangeText={(text) => updatePiece(piece.id, 'length', text)}
-                    keyboardType="numeric"
-                    placeholder="cm"
-                    placeholderTextColor="#666"
-                  />
-                  <TouchableOpacity 
-                    style={styles.calcButton}
-                    onPress={() => openCalculator(piece.id, 'length')}
-                  >
-                    <Ionicons name="calculator" size={16} color="#4CAF50" />
-                  </TouchableOpacity>
-                </View>
+                <TextInput
+                  style={styles.pieceInput}
+                  value={piece.length}
+                  onChangeText={(text) => updatePiece(piece.id, 'length', text)}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor="#666"
+                />
               </View>
-              <View style={styles.pieceInputGroup}>
+              <View style={styles.pieceInputHalf}>
                 <Text style={styles.pieceInputLabel}>Ancho (cm)</Text>
-                <View style={styles.inputWithCalc}>
-                  <TextInput
-                    style={styles.pieceInputWithButton}
-                    value={piece.width}
-                    onChangeText={(text) => updatePiece(piece.id, 'width', text)}
-                    keyboardType="numeric"
-                    placeholder="cm"
-                    placeholderTextColor="#666"
-                  />
-                  <TouchableOpacity 
-                    style={styles.calcButton}
-                    onPress={() => openCalculator(piece.id, 'width')}
-                  >
-                    <Ionicons name="calculator" size={16} color="#4CAF50" />
-                  </TouchableOpacity>
-                </View>
+                <TextInput
+                  style={styles.pieceInput}
+                  value={piece.width}
+                  onChangeText={(text) => updatePiece(piece.id, 'width', text)}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor="#666"
+                />
               </View>
-              <View style={styles.pieceInputGroup}>
+            </View>
+            <View style={styles.pieceInputRow}>
+              <View style={styles.pieceInputHalf}>
                 <Text style={styles.pieceInputLabel}>Cantidad</Text>
                 <TextInput
                   style={styles.pieceInput}
@@ -679,6 +680,25 @@ export default function Index() {
                   placeholder="0"
                   placeholderTextColor="#666"
                 />
+              </View>
+              <View style={styles.pieceInputHalf}>
+                <Text style={styles.pieceInputLabel}>Calculadora</Text>
+                <View style={styles.calcButtonRow}>
+                  <TouchableOpacity 
+                    style={styles.calcButtonBig}
+                    onPress={() => openCalculator(piece.id, 'length')}
+                  >
+                    <Ionicons name="calculator" size={16} color="#fff" />
+                    <Text style={styles.calcButtonText}>Largo</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.calcButtonBig}
+                    onPress={() => openCalculator(piece.id, 'width')}
+                  >
+                    <Ionicons name="calculator" size={16} color="#fff" />
+                    <Text style={styles.calcButtonText}>Ancho</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
 
@@ -876,9 +896,9 @@ export default function Index() {
           </View>
 
           {/* Export Button */}
-          <TouchableOpacity style={styles.exportButton} onPress={exportToPDF}>
+          <TouchableOpacity style={styles.exportButton} onPress={() => setExportOptionsVisible(true)}>
             <Ionicons name="document-text-outline" size={22} color="#fff" />
-            <Text style={styles.exportButtonText}>Exportar a PDF</Text>
+            <Text style={styles.exportButtonText}>Exportar PDF</Text>
           </TouchableOpacity>
         </>
       ) : (
@@ -1093,6 +1113,53 @@ export default function Index() {
           </View>
         </View>
       </Modal>
+
+      {/* Export Options Modal */}
+      <Modal
+        visible={exportOptionsVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setExportOptionsVisible(false)}
+      >
+        <View style={styles.exportOverlay}>
+          <View style={styles.exportContent}>
+            <View style={styles.exportHeader}>
+              <Text style={styles.exportTitle}>Exportar Despiece</Text>
+              <TouchableOpacity onPress={() => setExportOptionsVisible(false)}>
+                <Ionicons name="close" size={24} color="#888" />
+              </TouchableOpacity>
+            </View>
+            
+            <TouchableOpacity 
+              style={styles.exportOption} 
+              onPress={() => exportToPDF('share')}
+            >
+              <View style={styles.exportOptionIcon}>
+                <Ionicons name="share-outline" size={28} color="#2196F3" />
+              </View>
+              <View style={styles.exportOptionText}>
+                <Text style={styles.exportOptionTitle}>Compartir PDF</Text>
+                <Text style={styles.exportOptionDesc}>Enviar por WhatsApp, email, etc.</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={24} color="#666" />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.exportOption} 
+              onPress={() => exportToPDF('print')}
+            >
+              <View style={styles.exportOptionIcon}>
+                <Ionicons name="print-outline" size={28} color="#4CAF50" />
+              </View>
+              <View style={styles.exportOptionText}>
+                <Text style={styles.exportOptionTitle}>Imprimir</Text>
+                <Text style={styles.exportOptionDesc}>Imprimir directamente o guardar como PDF</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1233,6 +1300,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
+  pieceInputRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 10,
+  },
+  pieceInputHalf: {
+    flex: 1,
+  },
   pieceInputGroup: {
     flex: 1,
   },
@@ -1254,6 +1329,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#2a2a2a',
     borderRadius: 8,
+    overflow: 'hidden',
   },
   pieceInputWithButton: {
     flex: 1,
@@ -1263,9 +1339,28 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   calcButton: {
-    padding: 10,
-    borderLeftWidth: 1,
-    borderLeftColor: '#444',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: '#4CAF50',
+  },
+  calcButtonRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  calcButtonBig: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4CAF50',
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 4,
+  },
+  calcButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   rotationRow: {
     flexDirection: 'row',
@@ -1758,5 +1853,59 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+  },
+  // Export options modal styles
+  exportOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'flex-end',
+  },
+  exportContent: {
+    backgroundColor: '#1e1e1e',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 40,
+  },
+  exportHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  exportTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  exportOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  exportOptionIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: '#333',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  exportOptionText: {
+    flex: 1,
+  },
+  exportOptionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  exportOptionDesc: {
+    fontSize: 13,
+    color: '#888',
   },
 });
