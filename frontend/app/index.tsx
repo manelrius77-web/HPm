@@ -159,12 +159,9 @@ export default function Index() {
 
   // Calculator functions
   const openCalculator = (pieceId: string, field: 'length' | 'width' | 'quantity') => {
-    const piece = pieces.find(p => p.id === pieceId);
-    if (piece) {
-      setCalculatorValue(piece[field]);
-      setCalculatorTarget({ pieceId, field });
-      setCalculatorVisible(true);
-    }
+    setCalculatorValue('');
+    setCalculatorTarget({ pieceId, field });
+    setCalculatorVisible(true);
   };
 
   const handleCalculatorPress = (key: string) => {
@@ -182,9 +179,11 @@ export default function Index() {
       } catch (e) {
         // Invalid expression, keep current value
       }
-    } else if (key === 'OK') {
-      if (calculatorTarget) {
-        updatePiece(calculatorTarget.pieceId, calculatorTarget.field, calculatorValue);
+    } else if (key === 'Largo' || key === 'Ancho' || key === 'Cant.') {
+      // Apply to specific field
+      if (calculatorTarget && calculatorValue) {
+        const field = key === 'Largo' ? 'length' : key === 'Ancho' ? 'width' : 'quantity';
+        updatePiece(calculatorTarget.pieceId, field, calculatorValue);
       }
       setCalculatorVisible(false);
       setCalculatorTarget(null);
@@ -682,23 +681,14 @@ export default function Index() {
                 />
               </View>
               <View style={styles.pieceInputHalf}>
-                <Text style={styles.pieceInputLabel}>Calculadora</Text>
-                <View style={styles.calcButtonRow}>
-                  <TouchableOpacity 
-                    style={styles.calcButtonBig}
-                    onPress={() => openCalculator(piece.id, 'length')}
-                  >
-                    <Ionicons name="calculator" size={16} color="#fff" />
-                    <Text style={styles.calcButtonText}>Largo</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={styles.calcButtonBig}
-                    onPress={() => openCalculator(piece.id, 'width')}
-                  >
-                    <Ionicons name="calculator" size={16} color="#fff" />
-                    <Text style={styles.calcButtonText}>Ancho</Text>
-                  </TouchableOpacity>
-                </View>
+                <Text style={styles.pieceInputLabel}> </Text>
+                <TouchableOpacity 
+                  style={styles.calcButtonSingle}
+                  onPress={() => openCalculator(piece.id, 'length')}
+                >
+                  <Ionicons name="calculator" size={20} color="#fff" />
+                  <Text style={styles.calcButtonText}>Calculadora</Text>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -1092,23 +1082,41 @@ export default function Index() {
             </View>
             
             <View style={styles.calculatorGrid}>
-              {['7', '8', '9', '÷', '4', '5', '6', 'x', '1', '2', '3', '-', 'C', '0', '.', '+', '⌫', '=', 'OK'].map((key) => (
+              {['7', '8', '9', '÷', '4', '5', '6', 'x', '1', '2', '3', '-', 'C', '0', '.', '+', '⌫', '='].map((key) => (
                 <TouchableOpacity
                   key={key}
                   style={[
                     styles.calculatorKey,
-                    key === 'OK' && styles.calculatorKeyOK,
                     ['÷', 'x', '-', '+', '='].includes(key) && styles.calculatorKeyOperator,
                     ['C', '⌫'].includes(key) && styles.calculatorKeyClear,
                   ]}
                   onPress={() => handleCalculatorPress(key)}
                 >
-                  <Text style={[
-                    styles.calculatorKeyText,
-                    key === 'OK' && styles.calculatorKeyTextOK,
-                  ]}>{key}</Text>
+                  <Text style={styles.calculatorKeyText}>{key}</Text>
                 </TouchableOpacity>
               ))}
+            </View>
+            
+            <Text style={styles.calculatorApplyLabel}>Aplicar resultado a:</Text>
+            <View style={styles.calculatorApplyRow}>
+              <TouchableOpacity
+                style={styles.calculatorApplyButton}
+                onPress={() => handleCalculatorPress('Largo')}
+              >
+                <Text style={styles.calculatorApplyText}>Largo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.calculatorApplyButton}
+                onPress={() => handleCalculatorPress('Ancho')}
+              >
+                <Text style={styles.calculatorApplyText}>Ancho</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.calculatorApplyButton}
+                onPress={() => handleCalculatorPress('Cant.')}
+              >
+                <Text style={styles.calculatorApplyText}>Cant.</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -1343,6 +1351,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: '#4CAF50',
   },
+  calcButtonSingle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
   calcButtonRow: {
     flexDirection: 'row',
     gap: 8,
@@ -1359,7 +1376,7 @@ const styles = StyleSheet.create({
   },
   calcButtonText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
   },
   rotationRow: {
@@ -1837,6 +1854,28 @@ const styles = StyleSheet.create({
   },
   calculatorKeyTextOK: {
     fontSize: 18,
+  },
+  calculatorApplyLabel: {
+    color: '#888',
+    fontSize: 14,
+    marginTop: 16,
+    marginBottom: 10,
+  },
+  calculatorApplyRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  calculatorApplyButton: {
+    flex: 1,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  calculatorApplyText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   // Export button styles
   exportButton: {
