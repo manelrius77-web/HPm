@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,10 +14,13 @@ import {
   Switch,
   Modal,
   FlatList,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -112,6 +115,14 @@ export default function Index() {
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [savingProject, setSavingProject] = useState(false);
 
+  // Calculator state
+  const [calculatorVisible, setCalculatorVisible] = useState(false);
+  const [calculatorValue, setCalculatorValue] = useState('');
+  const [calculatorTarget, setCalculatorTarget] = useState<{pieceId: string; field: 'length' | 'width' | 'quantity'} | null>(null);
+
+  // Scroll ref
+  const scrollViewRef = useRef<ScrollView>(null);
+
   // Load projects on mount
   useEffect(() => {
     if (activeTab === 'projects') {
@@ -137,6 +148,158 @@ export default function Index() {
   const addPiece = () => {
     const newId = String(Date.now());
     setPieces([...pieces, { id: newId, name: `Pieza ${pieces.length + 1}`, length: '', width: '', quantity: '0', canRotate: false, edgedLong: 0, edgedShort: 0 }]);
+    // Scroll to bottom after adding piece
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  };
+
+  // Calculator functions
+  const openCalculator = (pieceId: string, field: 'length' | 'width' | 'quantity') => {
+    const piece = pieces.find(p => p.id === pieceId);
+    if (piece) {
+      setCalculatorValue(piece[field]);
+      setCalculatorTarget({ pieceId, field });
+      setCalculatorVisible(true);
+    }
+  };
+
+  const handleCalculatorPress = (key: string) => {
+    if (key === 'C') {
+      setCalculatorValue('');
+    } else if (key === '⌫') {
+      setCalculatorValue(calculatorValue.slice(0, -1));
+    } else if (key === '=') {
+      // Try to evaluate expression
+      try {
+        const result = eval(calculatorValue.replace(/x/g, '*').replace(/÷/g, '/'));
+        if (!isNaN(result) && isFinite(result)) {
+          setCalculatorValue(String(Math.round(result * 100) / 100));
+        }
+      } catch (e) {
+        // Invalid expression, keep current value
+      }
+    } else if (key === 'OK') {
+      if (calculatorTarget) {
+        updatePiece(calculatorTarget.pieceId, calculatorTarget.field, calculatorValue);
+      }
+      setCalculatorVisible(false);
+      setCalculatorTarget(null);
+    } else {
+      setCalculatorValue(calculatorValue + key);
+    }
+  };
+
+  // Export to PDF function
+  const exportToPDF = async () => {
+    if (!result) return;
+
+    try {
+      const piecesHtml = pieces.filter(p => p.length && p.width).map((piece, index) => `
+        <tr>
+          <td style="padding: 8px; border: 1px solid #ddd;">${piece.name}</td>
+          <td style="padding: 8px; border: 1px solid #ddd;">${piece.length} x ${piece.width} cm</td>
+          <td style="padding: 8px; border: 1px solid #ddd;">${piece.quantity}</td>
+          <td style="padding: 8px; border: 1px solid #ddd;">${piece.canRotate ? 'Sí' : 'No'}</td>
+          <td style="padding: 8px; border: 1px solid #ddd;">${piece.edgedLong}L / ${piece.edgedShort}A</td>
+        </tr>
+      `).join('');
+
+      const boardsHtml = result.board_layouts.map(layout => `
+        <div style="margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px;">
+          <h3 style="margin: 0 0 10px 0;">Tablero ${layout.board_number}</h3>
+          <p><strong>Dimensiones:</strong> ${layout.board_length} x ${layout.board_width} cm</p>
+          <p><strong>Aprovechamiento:</strong> ${layout.utilization.toFixed(1)}%</p>
+          <p><strong>Piezas:</strong></p>
+          <ul>
+            ${layout.pieces.map(p => `<li>${p.name}: ${p.length}x${p.width}cm en posición (${p.x.toFixed(1)}, ${p.y.toFixed(1)})${p.rotated ? ' - Rotada' : ''}</li>`).join('')}
+          </ul>
+        </div>
+      `).join('');
+
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Despiece de Corte</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { color: #4CAF50; }
+            .summary { display: flex; gap: 20px; margin: 20px 0; }
+            .summary-card { background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center; flex: 1; }
+            .summary-number { font-size: 28px; font-weight: bold; color: #333; }
+            .summary-label { color: #666; }
+            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            th { background: #4CAF50; color: white; padding: 10px; text-align: left; }
+          </style>
+        </head>
+        <body>
+          <h1>Optimizador de Corte - Despiece</h1>
+          
+          <h2>Resumen</h2>
+          <div class="summary">
+            <div class="summary-card">
+              <div class="summary-number">${result.total_boards}</div>
+              <div class="summary-label">Tableros</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-number">${result.total_cuts}</div>
+              <div class="summary-label">Cortes</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-number">${result.waste_percentage}%</div>
+              <div class="summary-label">Desperdicio</div>
+            </div>
+            ${result.total_edge_meters > 0 ? `
+            <div class="summary-card">
+              <div class="summary-number">${result.total_edge_meters}m</div>
+              <div class="summary-label">Canto</div>
+            </div>
+            ` : ''}
+          </div>
+
+          <h2>Tablero Base</h2>
+          <p><strong>Dimensiones:</strong> ${boardLength} x ${boardWidth} cm</p>
+          <p><strong>Grosor de corte (kerf):</strong> ${kerf} cm</p>
+
+          <h2>Lista de Piezas</h2>
+          <table>
+            <tr>
+              <th>Nombre</th>
+              <th>Dimensiones</th>
+              <th>Cantidad</th>
+              <th>Rotable</th>
+              <th>Cantos</th>
+            </tr>
+            ${piecesHtml}
+          </table>
+
+          <h2>Distribución por Tablero</h2>
+          ${boardsHtml}
+
+          <p style="margin-top: 30px; color: #888; font-size: 12px;">
+            Generado el ${new Date().toLocaleDateString('es-ES')} a las ${new Date().toLocaleTimeString('es-ES')}
+          </p>
+        </body>
+        </html>
+      `;
+
+      const { uri } = await Print.printToFileAsync({ html });
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Exportar Despiece',
+          UTI: 'com.adobe.pdf'
+        });
+      } else {
+        Alert.alert('PDF Generado', `Archivo guardado en: ${uri}`);
+      }
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      Alert.alert('Error', 'No se pudo generar el PDF');
+    }
   };
 
   const removePiece = (id: string) => {
@@ -380,7 +543,12 @@ export default function Index() {
   };
 
   const renderInputTab = () => (
-    <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+    <ScrollView 
+      ref={scrollViewRef}
+      style={styles.scrollView} 
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
       {/* Current Project Info */}
       {currentProjectId && (
         <View style={styles.currentProjectBanner}>
@@ -465,25 +633,41 @@ export default function Index() {
             <View style={styles.pieceInputs}>
               <View style={styles.pieceInputGroup}>
                 <Text style={styles.pieceInputLabel}>Largo (cm)</Text>
-                <TextInput
-                  style={styles.pieceInput}
-                  value={piece.length}
-                  onChangeText={(text) => updatePiece(piece.id, 'length', text)}
-                  keyboardType="numeric"
-                  placeholder="cm"
-                  placeholderTextColor="#666"
-                />
+                <View style={styles.inputWithCalc}>
+                  <TextInput
+                    style={styles.pieceInputWithButton}
+                    value={piece.length}
+                    onChangeText={(text) => updatePiece(piece.id, 'length', text)}
+                    keyboardType="numeric"
+                    placeholder="cm"
+                    placeholderTextColor="#666"
+                  />
+                  <TouchableOpacity 
+                    style={styles.calcButton}
+                    onPress={() => openCalculator(piece.id, 'length')}
+                  >
+                    <Ionicons name="calculator" size={16} color="#4CAF50" />
+                  </TouchableOpacity>
+                </View>
               </View>
               <View style={styles.pieceInputGroup}>
                 <Text style={styles.pieceInputLabel}>Ancho (cm)</Text>
-                <TextInput
-                  style={styles.pieceInput}
-                  value={piece.width}
-                  onChangeText={(text) => updatePiece(piece.id, 'width', text)}
-                  keyboardType="numeric"
-                  placeholder="cm"
-                  placeholderTextColor="#666"
-                />
+                <View style={styles.inputWithCalc}>
+                  <TextInput
+                    style={styles.pieceInputWithButton}
+                    value={piece.width}
+                    onChangeText={(text) => updatePiece(piece.id, 'width', text)}
+                    keyboardType="numeric"
+                    placeholder="cm"
+                    placeholderTextColor="#666"
+                  />
+                  <TouchableOpacity 
+                    style={styles.calcButton}
+                    onPress={() => openCalculator(piece.id, 'width')}
+                  >
+                    <Ionicons name="calculator" size={16} color="#4CAF50" />
+                  </TouchableOpacity>
+                </View>
               </View>
               <View style={styles.pieceInputGroup}>
                 <Text style={styles.pieceInputLabel}>Cantidad</Text>
@@ -492,7 +676,7 @@ export default function Index() {
                   value={piece.quantity}
                   onChangeText={(text) => updatePiece(piece.id, 'quantity', text)}
                   keyboardType="numeric"
-                  placeholder="1"
+                  placeholder="0"
                   placeholderTextColor="#666"
                 />
               </View>
@@ -690,6 +874,12 @@ export default function Index() {
               ))}
             </View>
           </View>
+
+          {/* Export Button */}
+          <TouchableOpacity style={styles.exportButton} onPress={exportToPDF}>
+            <Ionicons name="document-text-outline" size={22} color="#fff" />
+            <Text style={styles.exportButtonText}>Exportar a PDF</Text>
+          </TouchableOpacity>
         </>
       ) : (
         <View style={styles.emptyResult}>
@@ -860,6 +1050,49 @@ export default function Index() {
           </View>
         </View>
       </Modal>
+
+      {/* Calculator Modal */}
+      <Modal
+        visible={calculatorVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCalculatorVisible(false)}
+      >
+        <View style={styles.calculatorOverlay}>
+          <View style={styles.calculatorContent}>
+            <View style={styles.calculatorHeader}>
+              <Text style={styles.calculatorTitle}>Calculadora</Text>
+              <TouchableOpacity onPress={() => setCalculatorVisible(false)}>
+                <Ionicons name="close" size={24} color="#888" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.calculatorDisplay}>
+              <Text style={styles.calculatorValue}>{calculatorValue || '0'}</Text>
+            </View>
+            
+            <View style={styles.calculatorGrid}>
+              {['7', '8', '9', '÷', '4', '5', '6', 'x', '1', '2', '3', '-', 'C', '0', '.', '+', '⌫', '=', 'OK'].map((key) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[
+                    styles.calculatorKey,
+                    key === 'OK' && styles.calculatorKeyOK,
+                    ['÷', 'x', '-', '+', '='].includes(key) && styles.calculatorKeyOperator,
+                    ['C', '⌫'].includes(key) && styles.calculatorKeyClear,
+                  ]}
+                  onPress={() => handleCalculatorPress(key)}
+                >
+                  <Text style={[
+                    styles.calculatorKeyText,
+                    key === 'OK' && styles.calculatorKeyTextOK,
+                  ]}>{key}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1015,6 +1248,24 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 15,
     color: '#fff',
+  },
+  inputWithCalc: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+  },
+  pieceInputWithButton: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: '#fff',
+  },
+  calcButton: {
+    padding: 10,
+    borderLeftWidth: 1,
+    borderLeftColor: '#444',
   },
   rotationRow: {
     flexDirection: 'row',
@@ -1422,5 +1673,90 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Calculator styles
+  calculatorOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'flex-end',
+  },
+  calculatorContent: {
+    backgroundColor: '#1e1e1e',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 40,
+  },
+  calculatorHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  calculatorTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  calculatorDisplay: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    minHeight: 60,
+    justifyContent: 'center',
+  },
+  calculatorValue: {
+    fontSize: 32,
+    fontWeight: '600',
+    color: '#fff',
+    textAlign: 'right',
+  },
+  calculatorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  calculatorKey: {
+    width: '23%',
+    aspectRatio: 1.5,
+    backgroundColor: '#333',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  calculatorKeyOperator: {
+    backgroundColor: '#FF9800',
+  },
+  calculatorKeyClear: {
+    backgroundColor: '#F44336',
+  },
+  calculatorKeyOK: {
+    backgroundColor: '#4CAF50',
+    width: '48%',
+  },
+  calculatorKeyText: {
+    fontSize: 22,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  calculatorKeyTextOK: {
+    fontSize: 18,
+  },
+  // Export button styles
+  exportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#9C27B0',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 16,
+    gap: 8,
+  },
+  exportButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
 });
