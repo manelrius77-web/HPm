@@ -118,7 +118,7 @@ export default function Index() {
   // Calculator state
   const [calculatorVisible, setCalculatorVisible] = useState(false);
   const [calculatorValue, setCalculatorValue] = useState('');
-  const [calculatorTarget, setCalculatorTarget] = useState<{pieceId: string; field: 'length' | 'width' | 'quantity'} | null>(null);
+  const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null);
 
   // Export options state
   const [exportOptionsVisible, setExportOptionsVisible] = useState(false);
@@ -158,9 +158,13 @@ export default function Index() {
   };
 
   // Calculator functions
-  const openCalculator = (pieceId: string, field: 'length' | 'width' | 'quantity') => {
+  const openCalculator = () => {
+    if (pieces.length === 0) {
+      Alert.alert('Error', 'Primero agrega una pieza');
+      return;
+    }
+    setSelectedPieceId(pieces[pieces.length - 1].id); // Select last piece by default
     setCalculatorValue('');
-    setCalculatorTarget({ pieceId, field });
     setCalculatorVisible(true);
   };
 
@@ -170,23 +174,21 @@ export default function Index() {
     } else if (key === '⌫') {
       setCalculatorValue(calculatorValue.slice(0, -1));
     } else if (key === '=') {
-      // Try to evaluate expression
       try {
         const result = eval(calculatorValue.replace(/x/g, '*').replace(/÷/g, '/'));
         if (!isNaN(result) && isFinite(result)) {
           setCalculatorValue(String(Math.round(result * 100) / 100));
         }
       } catch (e) {
-        // Invalid expression, keep current value
+        // Invalid expression
       }
     } else if (key === 'Largo' || key === 'Ancho' || key === 'Cant.') {
-      // Apply to specific field
-      if (calculatorTarget && calculatorValue) {
+      if (selectedPieceId && calculatorValue) {
         const field = key === 'Largo' ? 'length' : key === 'Ancho' ? 'width' : 'quantity';
-        updatePiece(calculatorTarget.pieceId, field, calculatorValue);
+        updatePiece(selectedPieceId, field, calculatorValue);
+        Alert.alert('Aplicado', `${calculatorValue} aplicado a ${key}`);
       }
       setCalculatorVisible(false);
-      setCalculatorTarget(null);
     } else {
       setCalculatorValue(calculatorValue + key);
     }
@@ -293,23 +295,37 @@ export default function Index() {
     try {
       const html = generatePDFHtml();
       
-      if (action === 'print') {
-        await Print.printAsync({ html });
-      } else {
-        const { uri } = await Print.printToFileAsync({ html });
-        
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(uri, {
-            mimeType: 'application/pdf',
-            dialogTitle: 'Exportar Despiece',
-            UTI: 'com.adobe.pdf'
-          });
-        } else {
-          Alert.alert('PDF Generado', `Archivo guardado en: ${uri}`);
+      if (Platform.OS === 'web') {
+        // For web, open print dialog directly
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          printWindow.document.write(html);
+          printWindow.document.close();
+          printWindow.focus();
+          setTimeout(() => {
+            printWindow.print();
+          }, 500);
         }
+        setExportOptionsVisible(false);
+      } else {
+        // For native, use expo-print
+        if (action === 'print') {
+          await Print.printAsync({ html });
+        } else {
+          const { uri } = await Print.printToFileAsync({ html });
+          
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(uri, {
+              mimeType: 'application/pdf',
+              dialogTitle: 'Exportar Despiece',
+              UTI: 'com.adobe.pdf'
+            });
+          } else {
+            Alert.alert('PDF Generado', `Archivo guardado en: ${uri}`);
+          }
+        }
+        setExportOptionsVisible(false);
       }
-      
-      setExportOptionsVisible(false);
     } catch (error) {
       console.error('Error exporting PDF:', error);
       Alert.alert('Error', 'No se pudo generar el PDF');
@@ -680,16 +696,7 @@ export default function Index() {
                   placeholderTextColor="#666"
                 />
               </View>
-              <View style={styles.pieceInputHalf}>
-                <Text style={styles.pieceInputLabel}> </Text>
-                <TouchableOpacity 
-                  style={styles.calcButtonSingle}
-                  onPress={() => openCalculator(piece.id, 'length')}
-                >
-                  <Ionicons name="calculator" size={20} color="#fff" />
-                  <Text style={styles.calcButtonText}>Calculadora</Text>
-                </TouchableOpacity>
-              </View>
+              <View style={styles.pieceInputHalf} />
             </View>
 
             {/* Rotation toggle */}
@@ -770,6 +777,13 @@ export default function Index() {
       {/* Action Buttons */}
       <View style={styles.actionButtons}>
         <TouchableOpacity
+          style={styles.calcButtonRed}
+          onPress={openCalculator}
+        >
+          <Ionicons name="calculator" size={22} color="#fff" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={styles.saveButton}
           onPress={() => {
             if (!projectName && !currentProjectId) {
@@ -791,7 +805,7 @@ export default function Index() {
             <ActivityIndicator color="#fff" />
           ) : (
             <>
-              <Ionicons name="calculator" size={22} color="#fff" />
+              <Ionicons name="cut-outline" size={22} color="#fff" />
               <Text style={styles.calculateButtonText}>Calcular</Text>
             </>
           )}
@@ -1456,8 +1470,16 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
     marginTop: 24,
+  },
+  calcButtonRed: {
+    backgroundColor: '#F44336',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   saveButton: {
     flex: 1,
