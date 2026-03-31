@@ -289,46 +289,41 @@ export default function Index() {
     `;
   };
 
-  const exportToPDF = async (action: 'share' | 'print') => {
+  const exportToPDF = async () => {
     if (!result) return;
 
     try {
       const html = generatePDFHtml();
       
-      if (Platform.OS === 'web') {
-        // For web, open print dialog directly
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
-          printWindow.document.write(html);
-          printWindow.document.close();
-          printWindow.focus();
-          setTimeout(() => {
-            printWindow.print();
-          }, 500);
-        }
-        setExportOptionsVisible(false);
-      } else {
-        // For native, use expo-print
-        if (action === 'print') {
-          await Print.printAsync({ html });
-        } else {
-          const { uri } = await Print.printToFileAsync({ html });
+      // Create hidden iframe for printing (better Safari compatibility)
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'absolute';
+      iframe.style.top = '-10000px';
+      iframe.style.left = '-10000px';
+      iframe.style.width = '210mm';
+      iframe.style.height = '297mm';
+      document.body.appendChild(iframe);
+      
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (iframeDoc) {
+        iframeDoc.open();
+        iframeDoc.write(html);
+        iframeDoc.close();
+        
+        // Wait for content to render
+        setTimeout(() => {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
           
-          if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(uri, {
-              mimeType: 'application/pdf',
-              dialogTitle: 'Exportar Despiece',
-              UTI: 'com.adobe.pdf'
-            });
-          } else {
-            Alert.alert('PDF Generado', `Archivo guardado en: ${uri}`);
-          }
-        }
-        setExportOptionsVisible(false);
+          // Remove iframe after printing
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+          }, 1000);
+        }, 500);
       }
     } catch (error) {
-      console.error('Error exporting PDF:', error);
-      Alert.alert('Error', 'No se pudo generar el PDF');
+      console.error('Error exporting:', error);
+      Alert.alert('Error', 'No se pudo imprimir. Inténtalo de nuevo.');
     }
   };
 
@@ -900,9 +895,9 @@ export default function Index() {
           </View>
 
           {/* Export Button */}
-          <TouchableOpacity style={styles.exportButton} onPress={() => setExportOptionsVisible(true)}>
-            <Ionicons name="document-text-outline" size={22} color="#fff" />
-            <Text style={styles.exportButtonText}>Exportar PDF</Text>
+          <TouchableOpacity style={styles.exportButton} onPress={exportToPDF}>
+            <Ionicons name="print-outline" size={22} color="#fff" />
+            <Text style={styles.exportButtonText}>Imprimir / Guardar PDF</Text>
           </TouchableOpacity>
         </>
       ) : (
