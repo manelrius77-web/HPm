@@ -294,7 +294,6 @@ export default function Index() {
       </head>
       <body>
         <div class="buttons">
-          <button class="btn btn-green" onclick="window.print()">🖨️ Imprimir/PDF</button>
           <button class="btn btn-blue" onclick="compartir()">📤 Compartir</button>
         </div>
 
@@ -380,15 +379,26 @@ export default function Index() {
       const html = generatePDFHtml();
       
       if (Platform.OS === 'web') {
-        // Web: open in new window for print
-        const newWindow = window.open('', '_blank');
-        if (newWindow) {
-          newWindow.document.write(html);
-          newWindow.document.close();
-        } else {
-          // Fallback: data URI
-          const dataUri = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
-          window.open(dataUri, '_blank');
+        // Web/Safari: use Blob URL (works better on mobile Safari)
+        try {
+          const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+          const blobUrl = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.target = '_blank';
+          link.rel = 'noopener';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          // Clean up after a delay
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+        } catch (blobError) {
+          // Fallback: window.open with document.write
+          const newWindow = window.open('', '_blank');
+          if (newWindow) {
+            newWindow.document.write(html);
+            newWindow.document.close();
+          }
         }
       } else {
         // Native: use expo-print + sharing
@@ -1243,52 +1253,6 @@ export default function Index() {
         </View>
       </Modal>
 
-      {/* Export Options Modal */}
-      <Modal
-        visible={exportOptionsVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setExportOptionsVisible(false)}
-      >
-        <View style={styles.exportOverlay}>
-          <View style={styles.exportContent}>
-            <View style={styles.exportHeader}>
-              <Text style={styles.exportTitle}>Exportar Despiece</Text>
-              <TouchableOpacity onPress={() => setExportOptionsVisible(false)}>
-                <Ionicons name="close" size={24} color="#888" />
-              </TouchableOpacity>
-            </View>
-            
-            <TouchableOpacity 
-              style={styles.exportOption} 
-              onPress={() => { setExportOptionsVisible(false); exportToPDF(); }}
-            >
-              <View style={styles.exportOptionIcon}>
-                <Ionicons name="share-outline" size={28} color="#2196F3" />
-              </View>
-              <View style={styles.exportOptionText}>
-                <Text style={styles.exportOptionTitle}>Compartir PDF</Text>
-                <Text style={styles.exportOptionDesc}>Enviar por WhatsApp, email, etc.</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={24} color="#666" />
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.exportOption} 
-              onPress={() => { setExportOptionsVisible(false); exportToPDF(); }}
-            >
-              <View style={styles.exportOptionIcon}>
-                <Ionicons name="print-outline" size={28} color="#4CAF50" />
-              </View>
-              <View style={styles.exportOptionText}>
-                <Text style={styles.exportOptionTitle}>Imprimir</Text>
-                <Text style={styles.exportOptionDesc}>Imprimir directamente o guardar como PDF</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -1302,30 +1266,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    gap: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#2a2a2a',
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#fff',
   },
   tabContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    gap: 6,
   },
   tab: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
     backgroundColor: '#1e1e1e',
     gap: 4,
   },
@@ -1333,7 +1297,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1b3a1b',
   },
   tabText: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#888',
     fontWeight: '500',
   },
@@ -1345,67 +1309,67 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
   },
   currentProjectBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1b3a1b',
-    padding: 12,
-    borderRadius: 10,
-    marginTop: 12,
-    gap: 8,
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 10,
+    gap: 6,
   },
   currentProjectText: {
     flex: 1,
     color: '#4CAF50',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
   },
   section: {
-    marginTop: 20,
+    marginTop: 14,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
+    gap: 6,
+    marginBottom: 8,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '600',
     color: '#fff',
   },
   inputRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
   inputGroup: {
     flex: 1,
   },
   inputGroupFull: {
-    marginTop: 12,
+    marginTop: 10,
   },
   inputLabel: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#aaa',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   input: {
     backgroundColor: '#1e1e1e',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
     color: '#fff',
     borderWidth: 1,
     borderColor: '#333',
   },
   pieceCard: {
     backgroundColor: '#1e1e1e',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: '#333',
   },
@@ -1413,11 +1377,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   pieceNameInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#fff',
     padding: 0,
@@ -1441,12 +1405,12 @@ const styles = StyleSheet.create({
   },
   pieceInputs: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   pieceInputRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 10,
+    gap: 10,
+    marginBottom: 8,
   },
   pieceInputHalf: {
     flex: 1,
@@ -1455,35 +1419,35 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   pieceInputLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#888',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   pieceInput: {
     backgroundColor: '#2a2a2a',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
+    borderRadius: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13,
     color: '#fff',
   },
   inputWithCalc: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#2a2a2a',
-    borderRadius: 8,
+    borderRadius: 7,
     overflow: 'hidden',
   },
   pieceInputWithButton: {
     flex: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13,
     color: '#fff',
   },
   calcButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     backgroundColor: '#4CAF50',
   },
   calcButtonSingle: {
@@ -1518,8 +1482,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: 8,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#333',
   },
@@ -1536,7 +1500,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 10,
+    marginTop: 6,
   },
   edgedInfo: {
     flexDirection: 'row',
@@ -1552,9 +1516,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   edgedButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 7,
     backgroundColor: '#2a2a2a',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1577,36 +1541,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#4CAF50',
     borderStyle: 'dashed',
-    gap: 8,
+    gap: 6,
   },
   addButtonText: {
-    fontSize: 15,
+    fontSize: 13,
     color: '#4CAF50',
     fontWeight: '500',
   },
   actionButtons: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 24,
+    gap: 8,
+    marginTop: 16,
   },
   calcButtonRed: {
     backgroundColor: '#FFC107',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
   calcButtonYellow: {
     backgroundColor: '#FFC107',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1615,19 +1579,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1e1e1e',
-    paddingVertical: 16,
+    backgroundColor: '#2196F3',
+    paddingVertical: 12,
     paddingHorizontal: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#2196F3',
-    gap: 6,
+    borderRadius: 10,
     overflow: 'hidden',
   },
   saveButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#2196F3',
+    color: '#fff',
     flexShrink: 1,
   },
   calculateButton: {
@@ -1636,20 +1597,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#4CAF50',
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 6,
   },
   calculateButtonDisabled: {
     opacity: 0.6,
   },
   calculateButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#fff',
   },
   bottomSpacer: {
-    height: 40,
+    height: 30,
   },
   summarySection: {
     flexDirection: 'row',
