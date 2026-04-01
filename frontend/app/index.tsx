@@ -164,6 +164,19 @@ export default function Index() {
   const [cutPrice, setCutPrice] = useState('');
   const [pricingSaved, setPricingSaved] = useState(false);
 
+  // Furniture template state
+  const [templateVisible, setTemplateVisible] = useState(false);
+  const [templateType, setTemplateType] = useState<'armario' | 'estanteria' | 'cajonera' | 'mesa'>('armario');
+  const [templateAlto, setTemplateAlto] = useState('');
+  const [templateAncho, setTemplateAncho] = useState('');
+  const [templateFondo, setTemplateFondo] = useState('');
+  const [templateGrosor, setTemplateGrosor] = useState('1.8');
+  const [templateEstantes, setTemplateEstantes] = useState('2');
+  const [templatePuertas, setTemplatePuertas] = useState('2');
+  const [templateCajones, setTemplateCajones] = useState('3');
+  const [templateTrasera, setTemplateTrasera] = useState(true);
+  const [templateGrosorTrasera, setTemplateGrosorTrasera] = useState('0.5');
+
   // Scroll ref
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -209,6 +222,101 @@ export default function Index() {
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
+  };
+
+  // Furniture template piece generation
+  const generateTemplatePieces = () => {
+    const alto = parseFloat(templateAlto);
+    const ancho = parseFloat(templateAncho);
+    const fondo = parseFloat(templateFondo);
+    const g = parseFloat(templateGrosor);
+    const gT = parseFloat(templateGrosorTrasera) || 0.5;
+    const nEstantes = parseInt(templateEstantes) || 0;
+    const nPuertas = parseInt(templatePuertas) || 0;
+    const nCajones = parseInt(templateCajones) || 0;
+
+    if (!alto || !ancho || !fondo || !g) {
+      Alert.alert('Error', 'Rellena todas las medidas');
+      return;
+    }
+
+    const newPieces: Piece[] = [];
+    const ts = () => String(Date.now() + Math.random() * 1000);
+
+    const interiorAncho = ancho - (2 * g);
+    const interiorFondo = templateTrasera ? fondo - gT : fondo;
+
+    if (templateType === 'armario') {
+      // Laterales
+      newPieces.push({ id: ts(), name: 'Lateral', length: String(alto), width: String(fondo), quantity: '2', canRotate: false, edgedLong: 1, edgedShort: 0 });
+      // Techo
+      newPieces.push({ id: ts(), name: 'Techo', length: String(interiorAncho), width: String(fondo), quantity: '1', canRotate: false, edgedLong: 0, edgedShort: 1 });
+      // Suelo
+      newPieces.push({ id: ts(), name: 'Suelo', length: String(interiorAncho), width: String(fondo), quantity: '1', canRotate: false, edgedLong: 0, edgedShort: 1 });
+      // Estantes
+      if (nEstantes > 0) {
+        newPieces.push({ id: ts(), name: 'Estante', length: String(interiorAncho), width: String(interiorFondo), quantity: String(nEstantes), canRotate: false, edgedLong: 0, edgedShort: 1 });
+      }
+      // Puertas
+      if (nPuertas > 0) {
+        const puertaAncho = parseFloat((ancho / nPuertas).toFixed(1));
+        newPieces.push({ id: ts(), name: 'Puerta', length: String(alto), width: String(puertaAncho), quantity: String(nPuertas), canRotate: false, edgedLong: 2, edgedShort: 2 });
+      }
+      // Trasera
+      if (templateTrasera) {
+        newPieces.push({ id: ts(), name: 'Trasera', length: String(alto - (2 * g)), width: String(interiorAncho), quantity: '1', canRotate: true, edgedLong: 0, edgedShort: 0 });
+      }
+    } else if (templateType === 'estanteria') {
+      // Laterales
+      newPieces.push({ id: ts(), name: 'Lateral', length: String(alto), width: String(fondo), quantity: '2', canRotate: false, edgedLong: 1, edgedShort: 0 });
+      // Estantes (incluye techo y suelo)
+      newPieces.push({ id: ts(), name: 'Estante', length: String(interiorAncho), width: String(interiorFondo), quantity: String(nEstantes + 2), canRotate: false, edgedLong: 0, edgedShort: 1 });
+      // Trasera
+      if (templateTrasera) {
+        newPieces.push({ id: ts(), name: 'Trasera', length: String(alto), width: String(interiorAncho), quantity: '1', canRotate: true, edgedLong: 0, edgedShort: 0 });
+      }
+    } else if (templateType === 'cajonera') {
+      // Laterales
+      newPieces.push({ id: ts(), name: 'Lateral', length: String(alto), width: String(fondo), quantity: '2', canRotate: false, edgedLong: 1, edgedShort: 0 });
+      // Techo
+      newPieces.push({ id: ts(), name: 'Techo', length: String(interiorAncho), width: String(fondo), quantity: '1', canRotate: false, edgedLong: 0, edgedShort: 1 });
+      // Suelo
+      newPieces.push({ id: ts(), name: 'Suelo', length: String(interiorAncho), width: String(fondo), quantity: '1', canRotate: false, edgedLong: 0, edgedShort: 1 });
+      // Cajones
+      if (nCajones > 0) {
+        const alturaCajon = parseFloat(((alto - (2 * g)) / nCajones - g).toFixed(1));
+        const fondoCajon = parseFloat((interiorFondo - 3).toFixed(1)); // 3cm para guías
+        const anchoCajon = parseFloat((interiorAncho - 2.6).toFixed(1)); // holgura guías
+        // Frentes cajón
+        newPieces.push({ id: ts(), name: 'Frente cajón', length: String(interiorAncho), width: String(parseFloat((alturaCajon + g).toFixed(1))), quantity: String(nCajones), canRotate: false, edgedLong: 2, edgedShort: 2 });
+        // Laterales cajón
+        newPieces.push({ id: ts(), name: 'Lateral cajón', length: String(fondoCajon), width: String(alturaCajon), quantity: String(nCajones * 2), canRotate: false, edgedLong: 0, edgedShort: 1 });
+        // Trasera cajón
+        newPieces.push({ id: ts(), name: 'Trasera cajón', length: String(parseFloat((anchoCajon - (2 * g)).toFixed(1))), width: String(alturaCajon), quantity: String(nCajones), canRotate: false, edgedLong: 0, edgedShort: 0 });
+        // Fondo cajón
+        newPieces.push({ id: ts(), name: 'Fondo cajón', length: String(anchoCajon), width: String(fondoCajon), quantity: String(nCajones), canRotate: true, edgedLong: 0, edgedShort: 0 });
+      }
+      // Trasera
+      if (templateTrasera) {
+        newPieces.push({ id: ts(), name: 'Trasera', length: String(alto - (2 * g)), width: String(interiorAncho), quantity: '1', canRotate: true, edgedLong: 0, edgedShort: 0 });
+      }
+    } else if (templateType === 'mesa') {
+      // Sobre
+      newPieces.push({ id: ts(), name: 'Sobre', length: String(ancho), width: String(fondo), quantity: '1', canRotate: false, edgedLong: 2, edgedShort: 2 });
+      // Patas (si alto > grosor)
+      const altoPata = parseFloat((alto - g).toFixed(1));
+      newPieces.push({ id: ts(), name: 'Pata', length: String(altoPata), width: String(8), quantity: '4', canRotate: false, edgedLong: 2, edgedShort: 0 });
+      // Travesaños
+      newPieces.push({ id: ts(), name: 'Travesaño largo', length: String(parseFloat((ancho - 16).toFixed(1))), width: String(10), quantity: '2', canRotate: false, edgedLong: 0, edgedShort: 0 });
+      newPieces.push({ id: ts(), name: 'Travesaño ancho', length: String(parseFloat((fondo - 16).toFixed(1))), width: String(10), quantity: '2', canRotate: false, edgedLong: 0, edgedShort: 0 });
+    }
+
+    setPieces([...pieces, ...newPieces]);
+    setTemplateVisible(false);
+    Alert.alert('Plantilla aplicada', `Se han añadido ${newPieces.length} tipos de piezas`);
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 200);
   };
 
   // Calculator functions
@@ -890,10 +998,17 @@ export default function Index() {
           </View>
         ))}
 
-        <TouchableOpacity style={styles.addButton} onPress={addPiece}>
-          <Ionicons name="add-circle" size={24} color="#4CAF50" />
-          <Text style={styles.addButtonText}>Agregar pieza</Text>
-        </TouchableOpacity>
+        <View style={styles.addButtonsRow}>
+          <TouchableOpacity style={styles.addButton} onPress={addPiece}>
+            <Ionicons name="add-circle" size={20} color="#4CAF50" />
+            <Text style={styles.addButtonText}>Agregar pieza</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.templateButton} onPress={() => setTemplateVisible(true)}>
+            <Ionicons name="cube-outline" size={20} color="#2196F3" />
+            <Text style={styles.templateButtonText}>Plantilla mueble</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Action Buttons */}
@@ -1320,6 +1435,129 @@ export default function Index() {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Furniture Template Modal */}
+      <Modal
+        visible={templateVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setTemplateVisible(false)}
+      >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{flex: 1}}>
+        <View style={styles.templateOverlay}>
+          <ScrollView style={styles.templateScroll} contentContainerStyle={styles.templateScrollContent}>
+          <View style={styles.templateModalContent}>
+            <View style={styles.templateModalHeader}>
+              <Text style={styles.templateModalTitle}>Plantilla Mueble</Text>
+              <TouchableOpacity onPress={() => setTemplateVisible(false)}>
+                <Ionicons name="close" size={24} color="#888" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Template type selector */}
+            <Text style={styles.templateLabel}>Tipo de mueble</Text>
+            <View style={styles.templateTypeRow}>
+              {([
+                { key: 'armario', icon: 'file-tray-stacked-outline', label: 'Armario' },
+                { key: 'estanteria', icon: 'library-outline', label: 'Estantería' },
+                { key: 'cajonera', icon: 'filing-outline', label: 'Cajonera' },
+                { key: 'mesa', icon: 'tablet-landscape-outline', label: 'Mesa' },
+              ] as const).map((t) => (
+                <TouchableOpacity
+                  key={t.key}
+                  style={[styles.templateTypeBtn, templateType === t.key && styles.templateTypeBtnActive]}
+                  onPress={() => setTemplateType(t.key)}
+                >
+                  <Ionicons name={t.icon} size={22} color={templateType === t.key ? '#fff' : '#888'} />
+                  <Text style={[styles.templateTypeText, templateType === t.key && styles.templateTypeTextActive]}>{t.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Dimensions */}
+            <Text style={styles.templateLabel}>Medidas exteriores (cm)</Text>
+            <View style={styles.templateDimRow}>
+              <View style={styles.templateDimInput}>
+                <Text style={styles.templateDimLabel}>Alto</Text>
+                <TextInput style={styles.templateInput} value={templateAlto} onChangeText={setTemplateAlto} keyboardType="decimal-pad" placeholder="0" placeholderTextColor="#555" />
+              </View>
+              <View style={styles.templateDimInput}>
+                <Text style={styles.templateDimLabel}>Ancho</Text>
+                <TextInput style={styles.templateInput} value={templateAncho} onChangeText={setTemplateAncho} keyboardType="decimal-pad" placeholder="0" placeholderTextColor="#555" />
+              </View>
+              <View style={styles.templateDimInput}>
+                <Text style={styles.templateDimLabel}>Fondo</Text>
+                <TextInput style={styles.templateInput} value={templateFondo} onChangeText={setTemplateFondo} keyboardType="decimal-pad" placeholder="0" placeholderTextColor="#555" />
+              </View>
+            </View>
+
+            {/* Material */}
+            <View style={styles.templateDimRow}>
+              <View style={styles.templateDimInput}>
+                <Text style={styles.templateDimLabel}>Grosor (cm)</Text>
+                <TextInput style={styles.templateInput} value={templateGrosor} onChangeText={setTemplateGrosor} keyboardType="decimal-pad" placeholder="1.8" placeholderTextColor="#555" />
+              </View>
+              {templateTrasera && (
+                <View style={styles.templateDimInput}>
+                  <Text style={styles.templateDimLabel}>Grosor trasera</Text>
+                  <TextInput style={styles.templateInput} value={templateGrosorTrasera} onChangeText={setTemplateGrosorTrasera} keyboardType="decimal-pad" placeholder="0.5" placeholderTextColor="#555" />
+                </View>
+              )}
+            </View>
+
+            {/* Options based on template type */}
+            {(templateType === 'armario' || templateType === 'estanteria') && (
+              <View style={styles.templateDimRow}>
+                <View style={styles.templateDimInput}>
+                  <Text style={styles.templateDimLabel}>Nº estantes</Text>
+                  <TextInput style={styles.templateInput} value={templateEstantes} onChangeText={setTemplateEstantes} keyboardType="number-pad" placeholder="2" placeholderTextColor="#555" />
+                </View>
+                {templateType === 'armario' && (
+                  <View style={styles.templateDimInput}>
+                    <Text style={styles.templateDimLabel}>Nº puertas</Text>
+                    <TextInput style={styles.templateInput} value={templatePuertas} onChangeText={setTemplatePuertas} keyboardType="number-pad" placeholder="2" placeholderTextColor="#555" />
+                  </View>
+                )}
+              </View>
+            )}
+
+            {templateType === 'cajonera' && (
+              <View style={styles.templateDimRow}>
+                <View style={styles.templateDimInput}>
+                  <Text style={styles.templateDimLabel}>Nº cajones</Text>
+                  <TextInput style={styles.templateInput} value={templateCajones} onChangeText={setTemplateCajones} keyboardType="number-pad" placeholder="3" placeholderTextColor="#555" />
+                </View>
+              </View>
+            )}
+
+            {/* Trasera toggle */}
+            {templateType !== 'mesa' && (
+              <View style={styles.templateToggleRow}>
+                <Text style={styles.templateToggleLabel}>Incluir trasera</Text>
+                <Switch
+                  value={templateTrasera}
+                  onValueChange={setTemplateTrasera}
+                  trackColor={{ false: '#333', true: '#4CAF50' }}
+                  thumbColor="#fff"
+                />
+              </View>
+            )}
+
+            {/* Buttons */}
+            <View style={styles.templateModalButtons}>
+              <TouchableOpacity style={styles.templateCancelBtn} onPress={() => setTemplateVisible(false)}>
+                <Text style={styles.templateCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.templateGenerateBtn} onPress={generateTemplatePieces}>
+                <Ionicons name="construct-outline" size={20} color="#fff" />
+                <Text style={styles.templateGenerateText}>Generar piezas</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          </ScrollView>
+        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Pricing Modal */}
@@ -2382,5 +2620,152 @@ const styles = StyleSheet.create({
   exportOptionDesc: {
     fontSize: 13,
     color: '#888',
+  },
+  // Template styles
+  addButtonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  templateButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#2196F3',
+    borderStyle: 'dashed',
+    gap: 6,
+  },
+  templateButtonText: {
+    fontSize: 13,
+    color: '#2196F3',
+    fontWeight: '500',
+  },
+  templateOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+  },
+  templateScroll: {
+    flex: 1,
+  },
+  templateScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
+  templateModalContent: {
+    backgroundColor: '#1e1e1e',
+    borderRadius: 16,
+    padding: 18,
+  },
+  templateModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  templateModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  templateLabel: {
+    fontSize: 12,
+    color: '#aaa',
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+  templateTypeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  templateTypeBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#2a2a2a',
+    gap: 4,
+  },
+  templateTypeBtnActive: {
+    backgroundColor: '#2196F3',
+  },
+  templateTypeText: {
+    fontSize: 10,
+    color: '#888',
+    fontWeight: '500',
+  },
+  templateTypeTextActive: {
+    color: '#fff',
+  },
+  templateDimRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  templateDimInput: {
+    flex: 1,
+  },
+  templateDimLabel: {
+    fontSize: 11,
+    color: '#888',
+    marginBottom: 4,
+  },
+  templateInput: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: '#fff',
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  templateToggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+    paddingVertical: 4,
+  },
+  templateToggleLabel: {
+    fontSize: 14,
+    color: '#ccc',
+  },
+  templateModalButtons: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  templateCancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: '#333',
+    alignItems: 'center',
+  },
+  templateCancelText: {
+    color: '#ccc',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  templateGenerateBtn: {
+    flex: 1.5,
+    flexDirection: 'row',
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: '#2196F3',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  templateGenerateText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
