@@ -93,6 +93,39 @@ const PIECE_COLORS = [
   '#3F51B5', '#009688', '#CDDC39', '#FF5722', '#673AB7',
 ];
 
+// Helper: Generate a color map based on piece dimensions (same size = same color)
+const getDimensionColorMap = (pieces: PlacedPiece[]): Record<string, string> => {
+  const colorMap: Record<string, string> = {};
+  let colorIndex = 0;
+  pieces.forEach((piece) => {
+    // Normalize: always use smaller x larger as key
+    const dims = [piece.length, piece.width].sort((a, b) => a - b);
+    const key = `${dims[0]}x${dims[1]}`;
+    if (!(key in colorMap)) {
+      colorMap[key] = PIECE_COLORS[colorIndex % PIECE_COLORS.length];
+      colorIndex++;
+    }
+  });
+  return colorMap;
+};
+
+// Build a global color map from ALL boards' pieces
+const getGlobalDimensionColorMap = (layouts: BoardLayout[]): Record<string, string> => {
+  const colorMap: Record<string, string> = {};
+  let colorIndex = 0;
+  layouts.forEach((layout) => {
+    layout.pieces.forEach((piece) => {
+      const dims = [piece.length, piece.width].sort((a, b) => a - b);
+      const key = `${dims[0]}x${dims[1]}`;
+      if (!(key in colorMap)) {
+        colorMap[key] = PIECE_COLORS[colorIndex % PIECE_COLORS.length];
+        colorIndex++;
+      }
+    });
+  });
+  return colorMap;
+};
+
 export default function Index() {
   // Board state
   const [boardLength, setBoardLength] = useState('244');
@@ -199,15 +232,22 @@ export default function Index() {
   const generatePDFHtml = () => {
     if (!result) return '';
 
-    const piecesHtml = pieces.filter(p => p.length && p.width).map((piece, index) => `
+    // Build global color map for consistent colors across boards
+    const globalColorMap = getGlobalDimensionColorMap(result.board_layouts);
+
+    const piecesHtml = pieces.filter(p => p.length && p.width).map((piece, index) => {
+      const dims = [parseFloat(piece.length), parseFloat(piece.width)].sort((a, b) => a - b);
+      const key = `${dims[0]}x${dims[1]}`;
+      const color = globalColorMap[key] || PIECE_COLORS[index % PIECE_COLORS.length];
+      return `
       <tr>
-        <td style="padding: 8px; border: 1px solid #ddd;">${piece.name}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;"><span style="display:inline-block;width:14px;height:14px;background:${color};border-radius:3px;vertical-align:middle;margin-right:6px;"></span>${piece.name}</td>
         <td style="padding: 8px; border: 1px solid #ddd;">${piece.length} x ${piece.width} cm</td>
         <td style="padding: 8px; border: 1px solid #ddd;">${piece.quantity}</td>
         <td style="padding: 8px; border: 1px solid #ddd;">${piece.canRotate ? 'Sí' : 'No'}</td>
         <td style="padding: 8px; border: 1px solid #ddd;">${piece.edgedLong}L / ${piece.edgedShort}A</td>
       </tr>
-    `).join('');
+    `}).join('');
 
     const boardsHtml = result.board_layouts.map(layout => `
       <div style="margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px;">
@@ -308,12 +348,18 @@ export default function Index() {
         <script>
           function compartir() {
             if (navigator.share) {
+              // Try sharing with URL first (works better on iOS Safari)
               navigator.share({
                 title: 'Despiece de Corte',
-                text: 'Tableros: ${result.total_boards}, Cortes: ${result.total_cuts}, Desperdicio: ${result.waste_percentage}%'
-              }).catch(function(){});
+                text: 'Tableros: ${result.total_boards}, Cortes: ${result.total_cuts}, Desperdicio: ${result.waste_percentage}%',
+                url: window.location.href
+              }).catch(function(err){
+                // If share fails, fallback to print
+                window.print();
+              });
             } else {
-              alert('Usa el botón compartir de Safari (cuadrado con flecha)');
+              // Fallback: try to print directly which on iOS opens the share sheet
+              window.print();
             }
           }
         </script>
@@ -322,7 +368,7 @@ export default function Index() {
     `;
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
     if (!result) {
       Alert.alert('Error', 'Primero calcula el despiece');
       return;
@@ -333,19 +379,38 @@ export default function Index() {
     try {
       const html = generatePDFHtml();
       
-      // Create data URI
-      const dataUri = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
-      
-      // Open in new window/tab
-      const opened = window.open(dataUri, '_blank');
-      
-      if (!opened) {
-        // If popup blocked, try location change
-        window.location.href = dataUri;
+      if (Platform.OS === 'web') {
+        // Web: open in new window for print
+        const newWindow = window.open('', '_blank');
+        if (newWindow) {
+          newWindow.document.write(html);
+          newWindow.document.close();
+        } else {
+          // Fallback: data URI
+          const dataUri = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
+          window.open(dataUri, '_blank');
+        }
+      } else {
+        // Native: use expo-print + sharing
+        try {
+          const { uri } = await Print.printToFileAsync({ html });
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(uri, {
+              mimeType: 'application/pdf',
+              dialogTitle: 'Exportar Despiece',
+              UTI: 'com.adobe.pdf',
+            });
+          } else {
+            await Print.printAsync({ uri });
+          }
+        } catch (nativeError) {
+          // Fallback to direct print
+          await Print.printAsync({ html });
+        }
       }
     } catch (error) {
       console.error('Export error:', error);
-      Alert.alert('Error', 'No se pudo exportar');
+      Alert.alert('Error', 'No se pudo exportar. Intenta de nuevo.');
     } finally {
       setExporting(false);
     }
@@ -534,7 +599,7 @@ export default function Index() {
     setActiveTab('input');
   };
 
-  const renderBoardDiagram = (layout: BoardLayout, index: number) => {
+  const renderBoardDiagram = (layout: BoardLayout, index: number, globalColorMap: Record<string, string>) => {
     const maxWidth = SCREEN_WIDTH - 48;
     const scale = maxWidth / layout.board_length;
     const scaledHeight = layout.board_width * scale;
@@ -554,11 +619,14 @@ export default function Index() {
             const pieceTop = piece.y * scale;
             const pieceWidth = piece.length * scale;
             const pieceHeight = piece.width * scale;
-            const color = PIECE_COLORS[pieceIndex % PIECE_COLORS.length];
+            // Color by dimension: same size = same color
+            const dims = [piece.length, piece.width].sort((a, b) => a - b);
+            const dimKey = `${dims[0]}x${dims[1]}`;
+            const color = globalColorMap[dimKey] || PIECE_COLORS[pieceIndex % PIECE_COLORS.length];
 
             return (
               <View
-                key={piece.piece_id}
+                key={`${piece.piece_id}-${pieceIndex}`}
                 style={[
                   styles.placedPiece,
                   {
@@ -672,10 +740,11 @@ export default function Index() {
                 placeholderTextColor="#666"
               />
               <TouchableOpacity
-                style={styles.removeButton}
+                style={styles.removePieceButton}
                 onPress={() => removePiece(piece.id)}
               >
-                <Ionicons name="close-circle" size={24} color="#F44336" />
+                <Ionicons name="trash-outline" size={16} color="#fff" />
+                <Text style={styles.removePieceText}>Eliminar</Text>
               </TouchableOpacity>
             </View>
             
@@ -796,10 +865,10 @@ export default function Index() {
       {/* Action Buttons */}
       <View style={styles.actionButtons}>
         <TouchableOpacity
-          style={styles.calcButtonRed}
+          style={styles.calcButtonYellow}
           onPress={openCalculator}
         >
-          <Ionicons name="calculator" size={22} color="#fff" />
+          <Ionicons name="calculator" size={22} color="#000" />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -811,8 +880,7 @@ export default function Index() {
             setSaveModalVisible(true);
           }}
         >
-          <Ionicons name="save-outline" size={22} color="#2196F3" />
-          <Text style={styles.saveButtonText}>Guardar</Text>
+          <Text style={styles.saveButtonText} numberOfLines={1}>Guardar</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -835,7 +903,11 @@ export default function Index() {
     </ScrollView>
   );
 
-  const renderResultTab = () => (
+  const renderResultTab = () => {
+    // Build global color map for all boards
+    const globalColorMap = result ? getGlobalDimensionColorMap(result.board_layouts) : {};
+    
+    return (
     <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
       {result ? (
         <>
@@ -890,19 +962,23 @@ export default function Index() {
               <Ionicons name="map-outline" size={22} color="#9C27B0" />
               <Text style={styles.sectionTitle}>Diagrama de Corte</Text>
             </View>
-            {result.board_layouts.map((layout, index) => renderBoardDiagram(layout, index))}
+            {result.board_layouts.map((layout, index) => renderBoardDiagram(layout, index, globalColorMap))}
           </View>
 
-          {/* Piece Legend */}
+          {/* Piece Legend - color by dimension */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Ionicons name="list-outline" size={22} color="#607D8B" />
               <Text style={styles.sectionTitle}>Leyenda de Piezas</Text>
             </View>
             <View style={styles.legendContainer}>
-              {pieces.filter(p => p.length && p.width).map((piece, index) => (
+              {pieces.filter(p => p.length && p.width).map((piece, index) => {
+                const dims = [parseFloat(piece.length), parseFloat(piece.width)].sort((a, b) => a - b);
+                const dimKey = `${dims[0]}x${dims[1]}`;
+                const color = globalColorMap[dimKey] || PIECE_COLORS[index % PIECE_COLORS.length];
+                return (
                 <View key={piece.id} style={styles.legendItem}>
-                  <View style={[styles.legendColor, { backgroundColor: PIECE_COLORS[index % PIECE_COLORS.length] }]} />
+                  <View style={[styles.legendColor, { backgroundColor: color }]} />
                   <View style={styles.legendTextContainer}>
                     <Text style={styles.legendText}>
                       {piece.name}: {piece.length}x{piece.width}cm (x{piece.quantity})
@@ -914,7 +990,8 @@ export default function Index() {
                     </Text>
                   </View>
                 </View>
-              ))}
+                );
+              })}
             </View>
           </View>
 
@@ -929,7 +1006,7 @@ export default function Index() {
             ) : (
               <>
                 <Ionicons name="share-outline" size={22} color="#fff" />
-                <Text style={styles.exportButtonText}>Exportar</Text>
+                <Text style={styles.exportButtonText}>Exportar / Imprimir</Text>
               </>
             )}
           </TouchableOpacity>
@@ -943,7 +1020,8 @@ export default function Index() {
       
       <View style={styles.bottomSpacer} />
     </ScrollView>
-  );
+    );
+  };
 
   const renderProjectsTab = () => (
     <View style={styles.projectsContainer}>
@@ -1183,7 +1261,7 @@ export default function Index() {
             
             <TouchableOpacity 
               style={styles.exportOption} 
-              onPress={() => exportToPDF('share')}
+              onPress={() => { setExportOptionsVisible(false); exportToPDF(); }}
             >
               <View style={styles.exportOptionIcon}>
                 <Ionicons name="share-outline" size={28} color="#2196F3" />
@@ -1197,7 +1275,7 @@ export default function Index() {
 
             <TouchableOpacity 
               style={styles.exportOption} 
-              onPress={() => exportToPDF('print')}
+              onPress={() => { setExportOptionsVisible(false); exportToPDF(); }}
             >
               <View style={styles.exportOptionIcon}>
                 <Ionicons name="print-outline" size={28} color="#4CAF50" />
@@ -1346,6 +1424,20 @@ const styles = StyleSheet.create({
   },
   removeButton: {
     padding: 4,
+  },
+  removePieceButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F44336',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 4,
+  },
+  removePieceText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   pieceInputs: {
     flexDirection: 'row',
@@ -1503,7 +1595,15 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   calcButtonRed: {
-    backgroundColor: '#F44336',
+    backgroundColor: '#FFC107',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  calcButtonYellow: {
+    backgroundColor: '#FFC107',
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderRadius: 12,
@@ -1517,15 +1617,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#1e1e1e',
     paddingVertical: 16,
+    paddingHorizontal: 8,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#2196F3',
-    gap: 8,
+    gap: 6,
+    overflow: 'hidden',
   },
   saveButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#2196F3',
+    flexShrink: 1,
   },
   calculateButton: {
     flex: 2,
