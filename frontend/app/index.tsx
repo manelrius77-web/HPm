@@ -367,68 +367,57 @@ export default function Index() {
     `;
   };
 
-  // Web export: MUST be synchronous to avoid Safari popup blocker
-  const exportWeb = () => {
+  // Export function - works on both web and native
+  const exportToPDF = () => {
     if (!result) {
       Alert.alert('Error', 'Primero calcula el despiece');
       return;
     }
-    setExporting(true);
-    try {
-      const html = generatePDFHtml();
-      // Open window FIRST (synchronous, within user gesture)
-      const newWindow = window.open('', '_blank');
-      if (newWindow) {
-        newWindow.document.write(html);
-        newWindow.document.close();
-      } else {
-        // If popup blocked, use location.href as last resort
-        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-        const blobUrl = URL.createObjectURL(blob);
-        window.location.href = blobUrl;
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-      }
-    } catch (error) {
-      console.error('Export error:', error);
-      Alert.alert('Error', 'No se pudo exportar.');
-    } finally {
-      setExporting(false);
-    }
-  };
 
-  // Native export: async for expo-print/sharing
-  const exportNative = async () => {
-    if (!result) {
-      Alert.alert('Error', 'Primero calcula el despiece');
-      return;
-    }
     setExporting(true);
-    try {
-      const html = generatePDFHtml();
+    const html = generatePDFHtml();
+
+    if (Platform.OS === 'web') {
+      // Web: open in new window (synchronous for Safari)
       try {
-        const { uri } = await Print.printToFileAsync({ html });
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(uri, {
-            mimeType: 'application/pdf',
-            dialogTitle: 'Exportar Despiece',
-            UTI: 'com.adobe.pdf',
-          });
+        const newWindow = window.open('', '_blank');
+        if (newWindow) {
+          newWindow.document.write(html);
+          newWindow.document.close();
         } else {
-          await Print.printAsync({ uri });
+          window.location.href = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
         }
-      } catch (nativeError) {
-        await Print.printAsync({ html });
+      } catch (e) {
+        console.error('Web export error:', e);
       }
-    } catch (error) {
-      console.error('Export error:', error);
-      Alert.alert('Error', 'No se pudo exportar. Intenta de nuevo.');
-    } finally {
       setExporting(false);
+    } else {
+      // Native iOS/Android: use expo-print which opens native share/print dialog
+      Print.printAsync({ html })
+        .then(() => {
+          setExporting(false);
+        })
+        .catch((err: any) => {
+          console.error('Print error:', err);
+          // Fallback: try printToFileAsync + sharing
+          Print.printToFileAsync({ html })
+            .then((file: { uri: string }) => {
+              return Sharing.shareAsync(file.uri, {
+                mimeType: 'application/pdf',
+                dialogTitle: 'Exportar Despiece',
+              });
+            })
+            .then(() => {
+              setExporting(false);
+            })
+            .catch((shareErr: any) => {
+              console.error('Share error:', shareErr);
+              Alert.alert('Error', 'No se pudo exportar: ' + String(shareErr));
+              setExporting(false);
+            });
+        });
     }
   };
-
-  // Choose export method based on platform
-  const exportToPDF = Platform.OS === 'web' ? exportWeb : exportNative;
 
   const removePiece = (id: string) => {
     setPieces(pieces.filter(p => p.id !== id));
