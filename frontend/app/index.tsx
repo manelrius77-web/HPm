@@ -295,35 +295,33 @@ export default function Index() {
     try {
       const html = generatePDFHtml();
       
-      // Create hidden iframe for printing (better Safari compatibility)
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'absolute';
-      iframe.style.top = '-10000px';
-      iframe.style.left = '-10000px';
-      iframe.style.width = '210mm';
-      iframe.style.height = '297mm';
-      document.body.appendChild(iframe);
+      // Create a Blob with the HTML content
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
       
-      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-      if (iframeDoc) {
-        iframeDoc.open();
-        iframeDoc.write(html);
-        iframeDoc.close();
-        
-        // Wait for content to render
-        setTimeout(() => {
-          iframe.contentWindow?.focus();
-          iframe.contentWindow?.print();
-          
-          // Remove iframe after printing
-          setTimeout(() => {
-            document.body.removeChild(iframe);
-          }, 1000);
-        }, 500);
+      // Create a link and trigger download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'despiece.html';
+      link.target = '_blank';
+      
+      // For iOS Safari, open in new tab
+      if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        window.open(url, '_blank');
+        Alert.alert('Exportado', 'Se abrió el documento. Usa el menú de compartir de Safari para guardar como PDF o imprimir.');
+      } else {
+        // For desktop, trigger download
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       }
+      
+      // Cleanup
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      
     } catch (error) {
       console.error('Error exporting:', error);
-      Alert.alert('Error', 'No se pudo imprimir. Inténtalo de nuevo.');
+      Alert.alert('Error', 'No se pudo exportar');
     }
   };
 
