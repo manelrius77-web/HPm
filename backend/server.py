@@ -8,6 +8,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional
 import uuid
+from pymongo import ReturnDocument
 from datetime import datetime
 
 ROOT_DIR = Path(__file__).parent
@@ -401,7 +402,7 @@ async def create_project(project: ProjectCreate):
 async def get_projects():
     """Get all saved projects"""
     try:
-        projects = await db.projects.find().sort("updated_at", -1).to_list(100)
+        projects = await db.projects.find({}, {"_id": 0}).sort("updated_at", -1).to_list(100)
         return [Project(**p) for p in projects]
     except Exception as e:
         logging.error(f"Error fetching projects: {str(e)}")
@@ -425,10 +426,6 @@ async def get_project(project_id: str):
 async def update_project(project_id: str, project: ProjectCreate):
     """Update an existing project"""
     try:
-        existing = await db.projects.find_one({"id": project_id})
-        if not existing:
-            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
-        
         updated_data = {
             "name": project.name,
             "board_length": project.board_length,
@@ -438,8 +435,13 @@ async def update_project(project_id: str, project: ProjectCreate):
             "updated_at": datetime.utcnow()
         }
         
-        await db.projects.update_one({"id": project_id}, {"$set": updated_data})
-        updated_project = await db.projects.find_one({"id": project_id})
+        updated_project = await db.projects.find_one_and_update(
+            {"id": project_id},
+            {"$set": updated_data},
+            return_document=ReturnDocument.AFTER
+        )
+        if not updated_project:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
         return Project(**updated_project)
     except HTTPException:
         raise
