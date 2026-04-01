@@ -226,20 +226,39 @@ export default function Index() {
       <html>
       <head>
         <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Despiece de Corte</title>
         <style>
-          body { font-family: Arial, sans-serif; padding: 20px; }
-          h1 { color: #4CAF50; }
-          .summary { display: flex; gap: 20px; margin: 20px 0; }
-          .summary-card { background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center; flex: 1; }
-          .summary-number { font-size: 28px; font-weight: bold; color: #333; }
-          .summary-label { color: #666; }
-          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-          th { background: #4CAF50; color: white; padding: 10px; text-align: left; }
+          body { font-family: -apple-system, Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+          h1 { color: #4CAF50; font-size: 22px; }
+          h2 { font-size: 18px; }
+          .summary { display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap; }
+          .summary-card { background: #f5f5f5; padding: 12px; border-radius: 8px; text-align: center; flex: 1; min-width: 60px; }
+          .summary-number { font-size: 22px; font-weight: bold; color: #333; }
+          .summary-label { color: #666; font-size: 11px; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px; }
+          th { background: #4CAF50; color: white; padding: 8px; text-align: left; }
+          td { padding: 6px; border: 1px solid #ddd; }
+          .buttons { 
+            position: sticky; top: 0; background: #fff; padding: 10px 0; 
+            display: flex; gap: 10px; border-bottom: 2px solid #4CAF50; margin-bottom: 15px;
+          }
+          .btn { 
+            flex: 1; padding: 14px; border: none; border-radius: 10px; 
+            font-size: 15px; font-weight: 600; cursor: pointer; color: white;
+          }
+          .btn-green { background: #4CAF50; }
+          .btn-blue { background: #2196F3; }
+          @media print { .buttons { display: none !important; } }
         </style>
       </head>
       <body>
-        <h1>Optimizador de Corte - Despiece</h1>
+        <div class="buttons">
+          <button class="btn btn-green" onclick="window.print()">🖨️ Imprimir/PDF</button>
+          <button class="btn btn-blue" onclick="compartir()">📤 Compartir</button>
+        </div>
+
+        <h1>Despiece de Corte</h1>
         
         <h2>Resumen</h2>
         <div class="summary">
@@ -265,15 +284,15 @@ export default function Index() {
 
         <h2>Tablero Base</h2>
         <p><strong>Dimensiones:</strong> ${boardLength} x ${boardWidth} cm</p>
-        <p><strong>Grosor de corte (kerf):</strong> ${kerf} cm</p>
+        <p><strong>Grosor de corte:</strong> ${kerf} cm</p>
 
         <h2>Lista de Piezas</h2>
         <table>
           <tr>
             <th>Nombre</th>
-            <th>Dimensiones</th>
-            <th>Cantidad</th>
-            <th>Rotable</th>
+            <th>Medidas</th>
+            <th>Cant.</th>
+            <th>Rota</th>
             <th>Cantos</th>
           </tr>
           ${piecesHtml}
@@ -282,9 +301,22 @@ export default function Index() {
         <h2>Distribución por Tablero</h2>
         ${boardsHtml}
 
-        <p style="margin-top: 30px; color: #888; font-size: 12px;">
-          Generado el ${new Date().toLocaleDateString('es-ES')} a las ${new Date().toLocaleTimeString('es-ES')}
+        <p style="margin-top: 20px; color: #888; font-size: 11px;">
+          ${new Date().toLocaleDateString('es-ES')} ${new Date().toLocaleTimeString('es-ES')}
         </p>
+
+        <script>
+          function compartir() {
+            if (navigator.share) {
+              navigator.share({
+                title: 'Despiece de Corte',
+                text: 'Tableros: ${result.total_boards}, Cortes: ${result.total_cuts}, Desperdicio: ${result.waste_percentage}%'
+              }).catch(function(){});
+            } else {
+              alert('Usa el botón compartir de Safari (cuadrado con flecha)');
+            }
+          }
+        </script>
       </body>
       </html>
     `;
