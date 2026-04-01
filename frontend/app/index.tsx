@@ -367,56 +367,57 @@ export default function Index() {
     `;
   };
 
-  const exportToPDF = async () => {
+  // Web export: MUST be synchronous to avoid Safari popup blocker
+  const exportWeb = () => {
     if (!result) {
       Alert.alert('Error', 'Primero calcula el despiece');
       return;
     }
-
     setExporting(true);
-    
     try {
       const html = generatePDFHtml();
-      
-      if (Platform.OS === 'web') {
-        // Web/Safari: use Blob URL (works better on mobile Safari)
-        try {
-          const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-          const blobUrl = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = blobUrl;
-          link.target = '_blank';
-          link.rel = 'noopener';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          // Clean up after a delay
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-        } catch (blobError) {
-          // Fallback: window.open with document.write
-          const newWindow = window.open('', '_blank');
-          if (newWindow) {
-            newWindow.document.write(html);
-            newWindow.document.close();
-          }
-        }
+      // Open window FIRST (synchronous, within user gesture)
+      const newWindow = window.open('', '_blank');
+      if (newWindow) {
+        newWindow.document.write(html);
+        newWindow.document.close();
       } else {
-        // Native: use expo-print + sharing
-        try {
-          const { uri } = await Print.printToFileAsync({ html });
-          if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(uri, {
-              mimeType: 'application/pdf',
-              dialogTitle: 'Exportar Despiece',
-              UTI: 'com.adobe.pdf',
-            });
-          } else {
-            await Print.printAsync({ uri });
-          }
-        } catch (nativeError) {
-          // Fallback to direct print
-          await Print.printAsync({ html });
+        // If popup blocked, use location.href as last resort
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const blobUrl = URL.createObjectURL(blob);
+        window.location.href = blobUrl;
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      Alert.alert('Error', 'No se pudo exportar.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // Native export: async for expo-print/sharing
+  const exportNative = async () => {
+    if (!result) {
+      Alert.alert('Error', 'Primero calcula el despiece');
+      return;
+    }
+    setExporting(true);
+    try {
+      const html = generatePDFHtml();
+      try {
+        const { uri } = await Print.printToFileAsync({ html });
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri, {
+            mimeType: 'application/pdf',
+            dialogTitle: 'Exportar Despiece',
+            UTI: 'com.adobe.pdf',
+          });
+        } else {
+          await Print.printAsync({ uri });
         }
+      } catch (nativeError) {
+        await Print.printAsync({ html });
       }
     } catch (error) {
       console.error('Export error:', error);
@@ -425,6 +426,9 @@ export default function Index() {
       setExporting(false);
     }
   };
+
+  // Choose export method based on platform
+  const exportToPDF = Platform.OS === 'web' ? exportWeb : exportNative;
 
   const removePiece = (id: string) => {
     setPieces(pieces.filter(p => p.id !== id));
