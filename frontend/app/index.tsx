@@ -174,6 +174,7 @@ export default function Index() {
   const [templateEstantes, setTemplateEstantes] = useState('2');
   const [templatePuertas, setTemplatePuertas] = useState('2');
   const [templateCajones, setTemplateCajones] = useState('3');
+  const [templateDivisiones, setTemplateDivisiones] = useState('0');
   const [templateTrasera, setTemplateTrasera] = useState(true);
   const [templateGrosorTrasera, setTemplateGrosorTrasera] = useState('0.5');
 
@@ -234,6 +235,7 @@ export default function Index() {
     const nEstantes = parseInt(templateEstantes) || 0;
     const nPuertas = parseInt(templatePuertas) || 0;
     const nCajones = parseInt(templateCajones) || 0;
+    const nDivisiones = parseInt(templateDivisiones) || 0;
 
     if (!alto || !ancho || !fondo || !g) {
       Alert.alert('Error', 'Rellena todas las medidas');
@@ -247,16 +249,28 @@ export default function Index() {
     const interiorFondo = templateTrasera ? fondo - gT : fondo;
 
     if (templateType === 'armario') {
-      // Laterales
+      // Laterales exteriores
       newPieces.push({ id: ts(), name: 'Lateral', length: String(alto), width: String(fondo), quantity: '2', canRotate: false, edgedLong: 1, edgedShort: 0 });
       // Techo
       newPieces.push({ id: ts(), name: 'Techo', length: String(interiorAncho), width: String(fondo), quantity: '1', canRotate: false, edgedLong: 0, edgedShort: 1 });
       // Suelo
       newPieces.push({ id: ts(), name: 'Suelo', length: String(interiorAncho), width: String(fondo), quantity: '1', canRotate: false, edgedLong: 0, edgedShort: 1 });
-      // Estantes
-      if (nEstantes > 0) {
-        newPieces.push({ id: ts(), name: 'Estante', length: String(interiorAncho), width: String(interiorFondo), quantity: String(nEstantes), canRotate: false, edgedLong: 0, edgedShort: 1 });
+
+      // Divisiones verticales
+      const nSections = nDivisiones + 1; // número de secciones
+      const interiorAlto = parseFloat((alto - (2 * g)).toFixed(1));
+      
+      if (nDivisiones > 0) {
+        // Divisores verticales: van de suelo a techo interior
+        newPieces.push({ id: ts(), name: 'División vertical', length: String(interiorAlto), width: String(interiorFondo), quantity: String(nDivisiones), canRotate: false, edgedLong: 1, edgedShort: 0 });
       }
+
+      // Estantes: ancho de cada sección descontando divisores
+      if (nEstantes > 0) {
+        const anchoSeccion = parseFloat(((interiorAncho - (nDivisiones * g)) / nSections).toFixed(1));
+        newPieces.push({ id: ts(), name: 'Estante', length: String(anchoSeccion), width: String(interiorFondo), quantity: String(nEstantes * nSections), canRotate: false, edgedLong: 0, edgedShort: 1 });
+      }
+
       // Puertas
       if (nPuertas > 0) {
         const puertaAncho = parseFloat((ancho / nPuertas).toFixed(1));
@@ -264,7 +278,7 @@ export default function Index() {
       }
       // Trasera
       if (templateTrasera) {
-        newPieces.push({ id: ts(), name: 'Trasera', length: String(alto - (2 * g)), width: String(interiorAncho), quantity: '1', canRotate: true, edgedLong: 0, edgedShort: 0 });
+        newPieces.push({ id: ts(), name: 'Trasera', length: String(interiorAlto), width: String(interiorAncho), quantity: '1', canRotate: true, edgedLong: 0, edgedShort: 0 });
       }
     } else if (templateType === 'estanteria') {
       // Laterales
@@ -1515,10 +1529,20 @@ export default function Index() {
                 </View>
                 {templateType === 'armario' && (
                   <View style={styles.templateDimInput}>
-                    <Text style={styles.templateDimLabel}>Nº puertas</Text>
-                    <TextInput style={styles.templateInput} value={templatePuertas} onChangeText={setTemplatePuertas} keyboardType="number-pad" placeholder="2" placeholderTextColor="#555" />
+                    <Text style={styles.templateDimLabel}>Divisiones vert.</Text>
+                    <TextInput style={styles.templateInput} value={templateDivisiones} onChangeText={setTemplateDivisiones} keyboardType="number-pad" placeholder="0" placeholderTextColor="#555" />
                   </View>
                 )}
+              </View>
+            )}
+
+            {templateType === 'armario' && (
+              <View style={styles.templateDimRow}>
+                <View style={styles.templateDimInput}>
+                  <Text style={styles.templateDimLabel}>Nº puertas</Text>
+                  <TextInput style={styles.templateInput} value={templatePuertas} onChangeText={setTemplatePuertas} keyboardType="number-pad" placeholder="2" placeholderTextColor="#555" />
+                </View>
+                <View style={styles.templateDimInput} />
               </View>
             )}
 
