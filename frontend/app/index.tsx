@@ -157,8 +157,28 @@ export default function Index() {
   const [exportOptionsVisible, setExportOptionsVisible] = useState(false);
   const [exporting, setExporting] = useState(false);
 
+  // Pricing state
+  const [pricingVisible, setPricingVisible] = useState(false);
+  const [boardPrice, setBoardPrice] = useState('');
+  const [edgePrice, setEdgePrice] = useState('');
+  const [cutPrice, setCutPrice] = useState('');
+  const [pricingSaved, setPricingSaved] = useState(false);
+
   // Scroll ref
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Pricing calculations
+  const getPricingTotals = () => {
+    if (!result) return null;
+    const bp = parseFloat(boardPrice) || 0;
+    const ep = parseFloat(edgePrice) || 0;
+    const cp = parseFloat(cutPrice) || 0;
+    const totalBoards = bp * result.total_boards;
+    const totalEdge = ep * (result.total_edge_meters || 0);
+    const totalCuts = cp * result.total_cuts;
+    const total = totalBoards + totalEdge + totalCuts;
+    return { totalBoards, totalEdge, totalCuts, total, bp, ep, cp };
+  };
 
   // Load projects on mount
   useEffect(() => {
@@ -339,6 +359,17 @@ export default function Index() {
 
         <h2>Distribución por Tablero</h2>
         ${boardsHtml}
+
+        ${pricingSaved && (parseFloat(boardPrice) > 0 || parseFloat(edgePrice) > 0 || parseFloat(cutPrice) > 0) ? `
+        <h2>Presupuesto</h2>
+        <table>
+          <tr><th>Concepto</th><th>Detalle</th><th>Importe</th></tr>
+          ${parseFloat(boardPrice) > 0 ? `<tr><td style="padding:8px;border:1px solid #ddd;">Tableros</td><td style="padding:8px;border:1px solid #ddd;">${result.total_boards} x ${parseFloat(boardPrice).toFixed(2)}€</td><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">${(result.total_boards * parseFloat(boardPrice)).toFixed(2)}€</td></tr>` : ''}
+          ${parseFloat(edgePrice) > 0 && result.total_edge_meters > 0 ? `<tr><td style="padding:8px;border:1px solid #ddd;">Canto</td><td style="padding:8px;border:1px solid #ddd;">${result.total_edge_meters}m x ${parseFloat(edgePrice).toFixed(2)}€/m</td><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">${(result.total_edge_meters * parseFloat(edgePrice)).toFixed(2)}€</td></tr>` : ''}
+          ${parseFloat(cutPrice) > 0 ? `<tr><td style="padding:8px;border:1px solid #ddd;">Cortes</td><td style="padding:8px;border:1px solid #ddd;">${result.total_cuts} x ${parseFloat(cutPrice).toFixed(2)}€</td><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">${(result.total_cuts * parseFloat(cutPrice)).toFixed(2)}€</td></tr>` : ''}
+          <tr style="background:#f0f0f0;"><td style="padding:10px;border:1px solid #ddd;font-weight:bold;" colspan="2">TOTAL</td><td style="padding:10px;border:1px solid #ddd;font-size:18px;font-weight:bold;color:#4CAF50;">${getPricingTotals()?.total.toFixed(2)}€</td></tr>
+        </table>
+        ` : ''}
 
         <p style="margin-top: 20px; color: #888; font-size: 11px;">
           ${new Date().toLocaleDateString('es-ES')} ${new Date().toLocaleTimeString('es-ES')}
@@ -998,21 +1029,66 @@ export default function Index() {
             </View>
           </View>
 
-          {/* Export Button */}
-          <TouchableOpacity 
-            style={[styles.exportButton, exporting && styles.exportButtonDisabled]} 
-            onPress={exportToPDF}
-            disabled={exporting}
-          >
-            {exporting ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="share-outline" size={22} color="#fff" />
-                <Text style={styles.exportButtonText}>Exportar / Imprimir</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          {/* Pricing summary - shown when saved */}
+          {pricingSaved && result && (parseFloat(boardPrice) > 0 || parseFloat(edgePrice) > 0 || parseFloat(cutPrice) > 0) && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="cash-outline" size={22} color="#FFC107" />
+                <Text style={styles.sectionTitle}>Presupuesto</Text>
+              </View>
+              <View style={styles.pricingCard}>
+                {parseFloat(boardPrice) > 0 && (
+                  <View style={styles.pricingRow}>
+                    <Text style={styles.pricingLabel}>Tableros ({result.total_boards} x {parseFloat(boardPrice).toFixed(2)}€)</Text>
+                    <Text style={styles.pricingValue}>{(result.total_boards * parseFloat(boardPrice)).toFixed(2)}€</Text>
+                  </View>
+                )}
+                {parseFloat(edgePrice) > 0 && result.total_edge_meters > 0 && (
+                  <View style={styles.pricingRow}>
+                    <Text style={styles.pricingLabel}>Canto ({result.total_edge_meters}m x {parseFloat(edgePrice).toFixed(2)}€/m)</Text>
+                    <Text style={styles.pricingValue}>{(result.total_edge_meters * parseFloat(edgePrice)).toFixed(2)}€</Text>
+                  </View>
+                )}
+                {parseFloat(cutPrice) > 0 && (
+                  <View style={styles.pricingRow}>
+                    <Text style={styles.pricingLabel}>Cortes ({result.total_cuts} x {parseFloat(cutPrice).toFixed(2)}€)</Text>
+                    <Text style={styles.pricingValue}>{(result.total_cuts * parseFloat(cutPrice)).toFixed(2)}€</Text>
+                  </View>
+                )}
+                <View style={styles.pricingDivider} />
+                <View style={styles.pricingRow}>
+                  <Text style={styles.pricingTotalLabel}>TOTAL</Text>
+                  <Text style={styles.pricingTotalValue}>{getPricingTotals()?.total.toFixed(2)}€</Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Action Buttons Row */}
+          <View style={styles.resultActionRow}>
+            <TouchableOpacity 
+              style={styles.pricingButton} 
+              onPress={() => setPricingVisible(true)}
+            >
+              <Ionicons name="cash-outline" size={20} color="#000" />
+              <Text style={styles.pricingButtonText}>Presupuesto</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.exportButton, exporting && styles.exportButtonDisabled]} 
+              onPress={exportToPDF}
+              disabled={exporting}
+            >
+              {exporting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="share-outline" size={20} color="#fff" />
+                  <Text style={styles.exportButtonText}>Exportar / Imprimir</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
         </>
       ) : (
         <View style={styles.emptyResult}>
@@ -1246,6 +1322,98 @@ export default function Index() {
         </View>
       </Modal>
 
+      {/* Pricing Modal */}
+      <Modal
+        visible={pricingVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPricingVisible(false)}
+      >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{flex: 1}}>
+        <View style={styles.pricingOverlay}>
+          <View style={styles.pricingModalContent}>
+            <View style={styles.pricingModalHeader}>
+              <Text style={styles.pricingModalTitle}>Presupuesto</Text>
+              <TouchableOpacity onPress={() => setPricingVisible(false)}>
+                <Ionicons name="close" size={24} color="#888" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.pricingInputRow}>
+              <Ionicons name="layers" size={20} color="#4CAF50" />
+              <View style={styles.pricingInputGroup}>
+                <Text style={styles.pricingInputLabel}>Precio tablero (€)</Text>
+                <TextInput
+                  style={styles.pricingInput}
+                  value={boardPrice}
+                  onChangeText={setBoardPrice}
+                  keyboardType="decimal-pad"
+                  placeholder="0.00"
+                  placeholderTextColor="#555"
+                />
+              </View>
+            </View>
+
+            <View style={styles.pricingInputRow}>
+              <Ionicons name="resize-outline" size={20} color="#2196F3" />
+              <View style={styles.pricingInputGroup}>
+                <Text style={styles.pricingInputLabel}>Precio canto (€/ml)</Text>
+                <TextInput
+                  style={styles.pricingInput}
+                  value={edgePrice}
+                  onChangeText={setEdgePrice}
+                  keyboardType="decimal-pad"
+                  placeholder="0.00"
+                  placeholderTextColor="#555"
+                />
+              </View>
+            </View>
+
+            <View style={styles.pricingInputRow}>
+              <Ionicons name="cut-outline" size={20} color="#FF9800" />
+              <View style={styles.pricingInputGroup}>
+                <Text style={styles.pricingInputLabel}>Precio corte (€/corte)</Text>
+                <TextInput
+                  style={styles.pricingInput}
+                  value={cutPrice}
+                  onChangeText={setCutPrice}
+                  keyboardType="decimal-pad"
+                  placeholder="0.00"
+                  placeholderTextColor="#555"
+                />
+              </View>
+            </View>
+
+            {/* Preview total */}
+            {result && (parseFloat(boardPrice) > 0 || parseFloat(edgePrice) > 0 || parseFloat(cutPrice) > 0) && (
+              <View style={styles.pricingPreview}>
+                <Text style={styles.pricingPreviewLabel}>Total estimado:</Text>
+                <Text style={styles.pricingPreviewValue}>{getPricingTotals()?.total.toFixed(2)}€</Text>
+              </View>
+            )}
+
+            <View style={styles.pricingModalButtons}>
+              <TouchableOpacity
+                style={styles.pricingCancelBtn}
+                onPress={() => setPricingVisible(false)}
+              >
+                <Text style={styles.pricingCancelText}>Salir</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.pricingSaveBtn}
+                onPress={() => {
+                  setPricingSaved(true);
+                  setPricingVisible(false);
+                }}
+              >
+                <Ionicons name="checkmark" size={20} color="#fff" />
+                <Text style={styles.pricingSaveText}>Guardar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1986,23 +2154,180 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   // Export button styles
+  resultActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 16,
+  },
+  pricingButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFC107',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    gap: 6,
+  },
+  pricingButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#000',
+  },
   exportButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#9C27B0',
     paddingVertical: 14,
     borderRadius: 12,
-    marginTop: 16,
     gap: 8,
   },
   exportButtonDisabled: {
     opacity: 0.6,
   },
   exportButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#fff',
+  },
+  // Pricing card in results
+  pricingCard: {
+    backgroundColor: '#1e1e1e',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#FFC107',
+  },
+  pricingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  pricingLabel: {
+    fontSize: 13,
+    color: '#ccc',
+    flex: 1,
+  },
+  pricingValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  pricingDivider: {
+    height: 1,
+    backgroundColor: '#444',
+    marginVertical: 8,
+  },
+  pricingTotalLabel: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#FFC107',
+  },
+  pricingTotalValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  // Pricing modal styles
+  pricingOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  pricingModalContent: {
+    backgroundColor: '#1e1e1e',
+    borderRadius: 16,
+    padding: 20,
+  },
+  pricingModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  pricingModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  pricingInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+  },
+  pricingInputGroup: {
+    flex: 1,
+  },
+  pricingInputLabel: {
+    fontSize: 12,
+    color: '#aaa',
+    marginBottom: 4,
+  },
+  pricingInput: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    color: '#fff',
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  pricingPreview: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 16,
+    marginTop: 4,
+  },
+  pricingPreviewLabel: {
+    fontSize: 14,
+    color: '#aaa',
+  },
+  pricingPreviewValue: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  pricingModalButtons: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+  },
+  pricingCancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: '#333',
+    alignItems: 'center',
+  },
+  pricingCancelText: {
+    color: '#ccc',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  pricingSaveBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: '#4CAF50',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  pricingSaveText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
   // Export options modal styles
   exportOverlay: {
