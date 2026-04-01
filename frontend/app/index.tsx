@@ -122,6 +122,7 @@ export default function Index() {
 
   // Export options state
   const [exportOptionsVisible, setExportOptionsVisible] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Scroll ref
   const scrollViewRef = useRef<ScrollView>(null);
@@ -289,39 +290,32 @@ export default function Index() {
     `;
   };
 
-  const exportToPDF = async () => {
-    if (!result) return;
+  const exportToPDF = () => {
+    if (!result) {
+      Alert.alert('Error', 'Primero calcula el despiece');
+      return;
+    }
 
+    setExporting(true);
+    
     try {
       const html = generatePDFHtml();
       
-      // Create a Blob with the HTML content
-      const blob = new Blob([html], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
+      // Create data URI
+      const dataUri = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
       
-      // Create a link and trigger download
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'despiece.html';
-      link.target = '_blank';
+      // Open in new window/tab
+      const opened = window.open(dataUri, '_blank');
       
-      // For iOS Safari, open in new tab
-      if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-        window.open(url, '_blank');
-        Alert.alert('Exportado', 'Se abrió el documento. Usa el menú de compartir de Safari para guardar como PDF o imprimir.');
-      } else {
-        // For desktop, trigger download
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+      if (!opened) {
+        // If popup blocked, try location change
+        window.location.href = dataUri;
       }
-      
-      // Cleanup
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-      
     } catch (error) {
-      console.error('Error exporting:', error);
+      console.error('Export error:', error);
       Alert.alert('Error', 'No se pudo exportar');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -893,9 +887,19 @@ export default function Index() {
           </View>
 
           {/* Export Button */}
-          <TouchableOpacity style={styles.exportButton} onPress={exportToPDF}>
-            <Ionicons name="print-outline" size={22} color="#fff" />
-            <Text style={styles.exportButtonText}>Imprimir / Guardar PDF</Text>
+          <TouchableOpacity 
+            style={[styles.exportButton, exporting && styles.exportButtonDisabled]} 
+            onPress={exportToPDF}
+            disabled={exporting}
+          >
+            {exporting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="share-outline" size={22} color="#fff" />
+                <Text style={styles.exportButtonText}>Exportar</Text>
+              </>
+            )}
           </TouchableOpacity>
         </>
       ) : (
@@ -1902,6 +1906,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginTop: 16,
     gap: 8,
+  },
+  exportButtonDisabled: {
+    opacity: 0.6,
   },
   exportButtonText: {
     fontSize: 16,
