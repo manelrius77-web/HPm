@@ -160,6 +160,7 @@ export default function Index() {
   // Pricing state
   const [pricingVisible, setPricingVisible] = useState(false);
   const [boardPrice, setBoardPrice] = useState('');
+  const [backBoardPrice, setBackBoardPrice] = useState('');
   const [edgePrice, setEdgePrice] = useState('');
   const [cutPrice, setCutPrice] = useState('');
   const [pricingSaved, setPricingSaved] = useState(false);
@@ -170,13 +171,13 @@ export default function Index() {
   const [templateAlto, setTemplateAlto] = useState('');
   const [templateAncho, setTemplateAncho] = useState('');
   const [templateFondo, setTemplateFondo] = useState('');
-  const [templateGrosor, setTemplateGrosor] = useState('1.8');
+  const [templateGrosor, setTemplateGrosor] = useState('1.9');
   const [templateEstantes, setTemplateEstantes] = useState('2');
   const [templatePuertas, setTemplatePuertas] = useState('2');
   const [templateCajones, setTemplateCajones] = useState('3');
   const [templateDivisiones, setTemplateDivisiones] = useState('0');
   const [templateTrasera, setTemplateTrasera] = useState(true);
-  const [templateGrosorTrasera, setTemplateGrosorTrasera] = useState('0.5');
+  const [templateGrosorTrasera, setTemplateGrosorTrasera] = useState('0.32');
 
   // Scroll ref
   const scrollViewRef = useRef<ScrollView>(null);
@@ -185,13 +186,18 @@ export default function Index() {
   const getPricingTotals = () => {
     if (!result) return null;
     const bp = parseFloat(boardPrice) || 0;
+    const bbp = parseFloat(backBoardPrice) || 0;
     const ep = parseFloat(edgePrice) || 0;
     const cp = parseFloat(cutPrice) || 0;
-    const totalBoards = bp * result.total_boards;
+    // Count back panels (pieces named "Trasera" or similar)
+    const backPanels = pieces.filter(p => p.name.toLowerCase().includes('trasera')).reduce((sum, p) => sum + (parseInt(p.quantity) || 0), 0);
+    const regularBoards = result.total_boards;
+    const totalBoards = bp * regularBoards;
+    const totalBackBoards = bbp * backPanels;
     const totalEdge = ep * (result.total_edge_meters || 0);
     const totalCuts = cp * result.total_cuts;
-    const total = totalBoards + totalEdge + totalCuts;
-    return { totalBoards, totalEdge, totalCuts, total, bp, ep, cp };
+    const total = totalBoards + totalBackBoards + totalEdge + totalCuts;
+    return { totalBoards, totalBackBoards, totalEdge, totalCuts, total, bp, bbp, ep, cp, backPanels, regularBoards };
   };
 
   // Load projects on mount
@@ -482,11 +488,12 @@ export default function Index() {
         <h2>Distribución por Tablero</h2>
         ${boardsHtml}
 
-        ${pricingSaved && (parseFloat(boardPrice) > 0 || parseFloat(edgePrice) > 0 || parseFloat(cutPrice) > 0) ? `
+        ${pricingSaved && (parseFloat(boardPrice) > 0 || parseFloat(backBoardPrice) > 0 || parseFloat(edgePrice) > 0 || parseFloat(cutPrice) > 0) ? `
         <h2>Presupuesto</h2>
         <table>
           <tr><th>Concepto</th><th>Detalle</th><th>Importe</th></tr>
           ${parseFloat(boardPrice) > 0 ? `<tr><td style="padding:8px;border:1px solid #ddd;">Tableros</td><td style="padding:8px;border:1px solid #ddd;">${result.total_boards} x ${parseFloat(boardPrice).toFixed(2)}€</td><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">${(result.total_boards * parseFloat(boardPrice)).toFixed(2)}€</td></tr>` : ''}
+          ${parseFloat(backBoardPrice) > 0 && (getPricingTotals()?.backPanels || 0) > 0 ? `<tr><td style="padding:8px;border:1px solid #ddd;">Traseras</td><td style="padding:8px;border:1px solid #ddd;">${getPricingTotals()?.backPanels} x ${parseFloat(backBoardPrice).toFixed(2)}€</td><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">${getPricingTotals()?.totalBackBoards.toFixed(2)}€</td></tr>` : ''}
           ${parseFloat(edgePrice) > 0 && result.total_edge_meters > 0 ? `<tr><td style="padding:8px;border:1px solid #ddd;">Canto</td><td style="padding:8px;border:1px solid #ddd;">${result.total_edge_meters}m x ${parseFloat(edgePrice).toFixed(2)}€/m</td><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">${(result.total_edge_meters * parseFloat(edgePrice)).toFixed(2)}€</td></tr>` : ''}
           ${parseFloat(cutPrice) > 0 ? `<tr><td style="padding:8px;border:1px solid #ddd;">Cortes</td><td style="padding:8px;border:1px solid #ddd;">${result.total_cuts} x ${parseFloat(cutPrice).toFixed(2)}€</td><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">${(result.total_cuts * parseFloat(cutPrice)).toFixed(2)}€</td></tr>` : ''}
           <tr style="background:#f0f0f0;"><td style="padding:10px;border:1px solid #ddd;font-weight:bold;" colspan="2">TOTAL</td><td style="padding:10px;border:1px solid #ddd;font-size:18px;font-weight:bold;color:#4CAF50;">${getPricingTotals()?.total.toFixed(2)}€</td></tr>
@@ -1159,7 +1166,7 @@ export default function Index() {
           </View>
 
           {/* Pricing summary - shown when saved */}
-          {pricingSaved && result && (parseFloat(boardPrice) > 0 || parseFloat(edgePrice) > 0 || parseFloat(cutPrice) > 0) && (
+          {pricingSaved && result && (parseFloat(boardPrice) > 0 || parseFloat(backBoardPrice) > 0 || parseFloat(edgePrice) > 0 || parseFloat(cutPrice) > 0) && (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Ionicons name="cash-outline" size={22} color="#FFC107" />
@@ -1168,20 +1175,26 @@ export default function Index() {
               <View style={styles.pricingCard}>
                 {parseFloat(boardPrice) > 0 && (
                   <View style={styles.pricingRow}>
-                    <Text style={styles.pricingLabel}>Tableros ({result.total_boards} x {parseFloat(boardPrice).toFixed(2)}€)</Text>
-                    <Text style={styles.pricingValue}>{(result.total_boards * parseFloat(boardPrice)).toFixed(2)}€</Text>
+                    <Text style={styles.pricingLabel}>Tableros ({getPricingTotals()?.regularBoards} x {parseFloat(boardPrice).toFixed(2)}€)</Text>
+                    <Text style={styles.pricingValue}>{getPricingTotals()?.totalBoards.toFixed(2)}€</Text>
+                  </View>
+                )}
+                {parseFloat(backBoardPrice) > 0 && (getPricingTotals()?.backPanels || 0) > 0 && (
+                  <View style={styles.pricingRow}>
+                    <Text style={styles.pricingLabel}>Traseras ({getPricingTotals()?.backPanels} x {parseFloat(backBoardPrice).toFixed(2)}€)</Text>
+                    <Text style={styles.pricingValue}>{getPricingTotals()?.totalBackBoards.toFixed(2)}€</Text>
                   </View>
                 )}
                 {parseFloat(edgePrice) > 0 && result.total_edge_meters > 0 && (
                   <View style={styles.pricingRow}>
                     <Text style={styles.pricingLabel}>Canto ({result.total_edge_meters}m x {parseFloat(edgePrice).toFixed(2)}€/m)</Text>
-                    <Text style={styles.pricingValue}>{(result.total_edge_meters * parseFloat(edgePrice)).toFixed(2)}€</Text>
+                    <Text style={styles.pricingValue}>{getPricingTotals()?.totalEdge.toFixed(2)}€</Text>
                   </View>
                 )}
                 {parseFloat(cutPrice) > 0 && (
                   <View style={styles.pricingRow}>
                     <Text style={styles.pricingLabel}>Cortes ({result.total_cuts} x {parseFloat(cutPrice).toFixed(2)}€)</Text>
-                    <Text style={styles.pricingValue}>{(result.total_cuts * parseFloat(cutPrice)).toFixed(2)}€</Text>
+                    <Text style={styles.pricingValue}>{getPricingTotals()?.totalCuts.toFixed(2)}€</Text>
                   </View>
                 )}
                 <View style={styles.pricingDivider} />
@@ -1506,19 +1519,39 @@ export default function Index() {
               </View>
             </View>
 
-            {/* Material */}
-            <View style={styles.templateDimRow}>
-              <View style={styles.templateDimInput}>
-                <Text style={styles.templateDimLabel}>Grosor (cm)</Text>
-                <TextInput style={styles.templateInput} value={templateGrosor} onChangeText={setTemplateGrosor} keyboardType="decimal-pad" placeholder="1.8" placeholderTextColor="#555" />
-              </View>
-              {templateTrasera && (
-                <View style={styles.templateDimInput}>
-                  <Text style={styles.templateDimLabel}>Grosor trasera</Text>
-                  <TextInput style={styles.templateInput} value={templateGrosorTrasera} onChangeText={setTemplateGrosorTrasera} keyboardType="decimal-pad" placeholder="0.5" placeholderTextColor="#555" />
-                </View>
-              )}
+            {/* Material - Grosor con presets */}
+            <Text style={styles.templateLabel}>Grosor tablero (cm)</Text>
+            <View style={styles.presetRow}>
+              {['1.6', '1.9', '3.0'].map((v) => (
+                <TouchableOpacity
+                  key={v}
+                  style={[styles.presetBtn, templateGrosor === v && styles.presetBtnActive]}
+                  onPress={() => setTemplateGrosor(v)}
+                >
+                  <Text style={[styles.presetBtnText, templateGrosor === v && styles.presetBtnTextActive]}>{v}</Text>
+                </TouchableOpacity>
+              ))}
+              <TextInput style={styles.presetInput} value={templateGrosor} onChangeText={setTemplateGrosor} keyboardType="decimal-pad" placeholderTextColor="#555" />
             </View>
+
+            {/* Grosor trasera con presets */}
+            {templateTrasera && templateType !== 'mesa' && (
+              <>
+                <Text style={styles.templateLabel}>Grosor trasera (cm)</Text>
+                <View style={styles.presetRow}>
+                  {['0.32', '1.0'].map((v) => (
+                    <TouchableOpacity
+                      key={v}
+                      style={[styles.presetBtn, templateGrosorTrasera === v && styles.presetBtnActive]}
+                      onPress={() => setTemplateGrosorTrasera(v)}
+                    >
+                      <Text style={[styles.presetBtnText, templateGrosorTrasera === v && styles.presetBtnTextActive]}>{v}</Text>
+                    </TouchableOpacity>
+                  ))}
+                  <TextInput style={styles.presetInput} value={templateGrosorTrasera} onChangeText={setTemplateGrosorTrasera} keyboardType="decimal-pad" placeholderTextColor="#555" />
+                </View>
+              </>
+            )}
 
             {/* Options based on template type */}
             {(templateType === 'armario' || templateType === 'estanteria') && (
@@ -1609,6 +1642,21 @@ export default function Index() {
                   style={styles.pricingInput}
                   value={boardPrice}
                   onChangeText={setBoardPrice}
+                  keyboardType="decimal-pad"
+                  placeholder="0.00"
+                  placeholderTextColor="#555"
+                />
+              </View>
+            </View>
+
+            <View style={styles.pricingInputRow}>
+              <Ionicons name="albums-outline" size={20} color="#795548" />
+              <View style={styles.pricingInputGroup}>
+                <Text style={styles.pricingInputLabel}>Precio tablero trasera (€)</Text>
+                <TextInput
+                  style={styles.pricingInput}
+                  value={backBoardPrice}
+                  onChangeText={setBackBoardPrice}
                   keyboardType="decimal-pad"
                   placeholder="0.00"
                   placeholderTextColor="#555"
@@ -2759,6 +2807,44 @@ const styles = StyleSheet.create({
   templateToggleLabel: {
     fontSize: 14,
     color: '#ccc',
+  },
+  presetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  presetBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#2a2a2a',
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  presetBtnActive: {
+    backgroundColor: '#2196F3',
+    borderColor: '#2196F3',
+  },
+  presetBtnText: {
+    fontSize: 14,
+    color: '#888',
+    fontWeight: '600',
+  },
+  presetBtnTextActive: {
+    color: '#fff',
+  },
+  presetInput: {
+    flex: 1,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 15,
+    color: '#fff',
+    borderWidth: 1,
+    borderColor: '#444',
+    textAlign: 'center',
   },
   templateModalButtons: {
     flexDirection: 'row',
