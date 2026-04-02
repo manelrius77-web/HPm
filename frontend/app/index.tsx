@@ -35,6 +35,7 @@ interface Piece {
   canRotate: boolean;
   edgedLong: number; // 0, 1, 2 cantos en lados largos
   edgedShort: number; // 0, 1, 2 cantos en lados cortos
+  color: string;
 }
 
 interface PlacedPiece {
@@ -177,6 +178,7 @@ export default function Index() {
   const [templatePuertas, setTemplatePuertas] = useState('2');
   const [templateCajones, setTemplateCajones] = useState('3');
   const [templateAlturaCajon, setTemplateAlturaCajon] = useState('');
+  const [templateColor, setTemplateColor] = useState('');
   const [templateDivisiones, setTemplateDivisiones] = useState('0');
   const [templateTrasera, setTemplateTrasera] = useState(true);
   const [templateGrosorTrasera, setTemplateGrosorTrasera] = useState('0.32');
@@ -226,7 +228,7 @@ export default function Index() {
 
   const addPiece = () => {
     const newId = String(Date.now());
-    setPieces([...pieces, { id: newId, name: `Pieza ${pieces.length + 1}`, length: '', width: '', quantity: '0', canRotate: false, edgedLong: 0, edgedShort: 0 }]);
+    setPieces([...pieces, { id: newId, name: `Pieza ${pieces.length + 1}`, length: '', width: '', quantity: '0', canRotate: false, edgedLong: 0, edgedShort: 0, color: '' }]);
     // Scroll to bottom after adding piece
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -256,9 +258,11 @@ export default function Index() {
     const interiorAncho = ancho - (2 * g);
     const interiorFondo = templateTrasera ? fondo - gT : fondo;
 
+    const c = templateColor;
+
     if (templateType === 'armario') {
       // Laterales exteriores
-      newPieces.push({ id: ts(), name: 'Lateral', length: String(alto), width: String(fondo), quantity: '2', canRotate: false, edgedLong: 1, edgedShort: 0 });
+      newPieces.push({ id: ts(), name: 'Lateral', length: String(alto), width: String(fondo), quantity: '2', canRotate: false, edgedLong: 1, edgedShort: 0, color: c });
       // Techo
       newPieces.push({ id: ts(), name: 'Techo', length: String(interiorAncho), width: String(fondo), quantity: '1', canRotate: false, edgedLong: 0, edgedShort: 1 });
       // Suelo
