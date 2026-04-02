@@ -176,6 +176,7 @@ export default function Index() {
   const [templateEstantes, setTemplateEstantes] = useState('2');
   const [templatePuertas, setTemplatePuertas] = useState('2');
   const [templateCajones, setTemplateCajones] = useState('3');
+  const [templateAlturaCajon, setTemplateAlturaCajon] = useState('');
   const [templateDivisiones, setTemplateDivisiones] = useState('0');
   const [templateTrasera, setTemplateTrasera] = useState(true);
   const [templateGrosorTrasera, setTemplateGrosorTrasera] = useState('0.32');
@@ -305,7 +306,10 @@ export default function Index() {
       newPieces.push({ id: ts(), name: 'Suelo', length: String(interiorAncho), width: String(fondo), quantity: '1', canRotate: false, edgedLong: 0, edgedShort: 1 });
       // Cajones
       if (nCajones > 0) {
-        const alturaCajon = parseFloat(((alto - (2 * g)) / nCajones - g).toFixed(1));
+        const alturaPersonalizada = parseFloat(templateAlturaCajon) || 0;
+        const alturaCajon = alturaPersonalizada > 0 
+          ? alturaPersonalizada 
+          : parseFloat(((alto - (2 * g)) / nCajones - g).toFixed(1));
         const fondoCajon = parseFloat((interiorFondo - 3).toFixed(1)); // 3cm para guías
         const anchoCajon = parseFloat((interiorAncho - 2.6).toFixed(1)); // holgura guías
         // Frentes cajón
@@ -419,24 +423,24 @@ export default function Index() {
         <title>Despiece de Corte</title>
         <style>
           body { font-family: -apple-system, Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
-          h1 { color: #4CAF50; font-size: 22px; }
+          h1 { color: #000; font-size: 22px; }
           h2 { font-size: 18px; }
           .summary { display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap; }
           .summary-card { background: #f5f5f5; padding: 12px; border-radius: 8px; text-align: center; flex: 1; min-width: 60px; }
           .summary-number { font-size: 22px; font-weight: bold; color: #333; }
           .summary-label { color: #666; font-size: 11px; }
           table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px; }
-          th { background: #4CAF50; color: white; padding: 8px; text-align: left; }
+          th { background: #333; color: white; padding: 8px; text-align: left; }
           td { padding: 6px; border: 1px solid #ddd; }
           .buttons { 
             position: sticky; top: 0; background: #fff; padding: 10px 0; 
-            display: flex; gap: 10px; border-bottom: 2px solid #4CAF50; margin-bottom: 15px;
+            display: flex; gap: 10px; border-bottom: 2px solid #333; margin-bottom: 15px;
           }
           .btn { 
             flex: 1; padding: 14px; border: none; border-radius: 10px; 
             font-size: 15px; font-weight: 600; cursor: pointer; color: white;
           }
-          .btn-green { background: #4CAF50; }
+          .btn-green { background: #333; }
           .btn-blue { background: #2196F3; }
           @media print { .buttons { display: none !important; } }
         </style>
@@ -497,7 +501,7 @@ export default function Index() {
           ${parseFloat(backBoardPrice) > 0 && (getPricingTotals()?.backPanels || 0) > 0 ? `<tr><td style="padding:8px;border:1px solid #ddd;">Traseras</td><td style="padding:8px;border:1px solid #ddd;">${getPricingTotals()?.backPanels} x ${parseFloat(backBoardPrice).toFixed(2)}€</td><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">${getPricingTotals()?.totalBackBoards.toFixed(2)}€</td></tr>` : ''}
           ${parseFloat(edgePrice) > 0 && result.total_edge_meters > 0 ? `<tr><td style="padding:8px;border:1px solid #ddd;">Canto</td><td style="padding:8px;border:1px solid #ddd;">${result.total_edge_meters}m x ${parseFloat(edgePrice).toFixed(2)}€/m</td><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">${(result.total_edge_meters * parseFloat(edgePrice)).toFixed(2)}€</td></tr>` : ''}
           ${parseFloat(cutPrice) > 0 ? `<tr><td style="padding:8px;border:1px solid #ddd;">Cortes</td><td style="padding:8px;border:1px solid #ddd;">${result.total_cuts} x ${parseFloat(cutPrice).toFixed(2)}€</td><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">${(result.total_cuts * parseFloat(cutPrice)).toFixed(2)}€</td></tr>` : ''}
-          <tr style="background:#f0f0f0;"><td style="padding:10px;border:1px solid #ddd;font-weight:bold;" colspan="2">TOTAL</td><td style="padding:10px;border:1px solid #ddd;font-size:18px;font-weight:bold;color:#4CAF50;">${getPricingTotals()?.total.toFixed(2)}€</td></tr>
+          <tr style="background:#f0f0f0;"><td style="padding:10px;border:1px solid #ddd;font-weight:bold;" colspan="2">TOTAL</td><td style="padding:10px;border:1px solid #ddd;font-size:18px;font-weight:bold;color:#000;">${getPricingTotals()?.total.toFixed(2)}€</td></tr>
         </table>
         ` : ''}
 
@@ -1313,6 +1317,16 @@ export default function Index() {
       <TouchableOpacity
         style={styles.welcomeCard}
         onPress={() => {
+          // Nuevo proyecto: limpiar todo
+          setPieces([]);
+          setResult(null);
+          setCurrentProjectId(null);
+          setProjectName('');
+          setPricingSaved(false);
+          setBoardPrice('');
+          setBackBoardPrice('');
+          setEdgePrice('');
+          setCutPrice('');
           setShowWelcome(false);
           setActiveTab('input');
         }}
@@ -1322,7 +1336,7 @@ export default function Index() {
         </View>
         <View style={styles.welcomeCardContent}>
           <Text style={styles.welcomeCardTitle}>Despiece manual</Text>
-          <Text style={styles.welcomeCardDesc}>Añade piezas una a una con sus medidas</Text>
+          <Text style={styles.welcomeCardDesc}>Nuevo proyecto desde cero</Text>
         </View>
         <Ionicons name="chevron-forward" size={24} color="#555" />
       </TouchableOpacity>
@@ -1330,6 +1344,12 @@ export default function Index() {
       <TouchableOpacity
         style={styles.welcomeCard}
         onPress={() => {
+          // Nuevo proyecto con plantilla
+          setPieces([]);
+          setResult(null);
+          setCurrentProjectId(null);
+          setProjectName('');
+          setPricingSaved(false);
           setShowWelcome(false);
           setActiveTab('input');
           setTimeout(() => setTemplateVisible(true), 300);
@@ -1380,7 +1400,8 @@ export default function Index() {
       {/* Header with back button */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => setShowWelcome(true)} style={styles.headerBackBtn}>
-          <Ionicons name="home-outline" size={22} color="#888" />
+          <Ionicons name="arrow-back" size={20} color="#fff" />
+          <Text style={styles.headerBackText}>Salir</Text>
         </TouchableOpacity>
         <Ionicons name="cog" size={24} color="#FFC107" />
         <Text style={styles.headerTitle}>Optimizador de Corte</Text>
@@ -1669,6 +1690,10 @@ export default function Index() {
                   <Text style={styles.templateDimLabel}>Nº cajones</Text>
                   <TextInput style={styles.templateInput} value={templateCajones} onChangeText={setTemplateCajones} keyboardType="number-pad" placeholder="3" placeholderTextColor="#555" />
                 </View>
+                <View style={styles.templateDimInput}>
+                  <Text style={styles.templateDimLabel}>Alto cajón (cm)</Text>
+                  <TextInput style={styles.templateInput} value={templateAlturaCajon} onChangeText={setTemplateAlturaCajon} keyboardType="decimal-pad" placeholder="Auto" placeholderTextColor="#555" />
+                </View>
               </View>
             )}
 
@@ -1829,8 +1854,16 @@ const styles = StyleSheet.create({
   },
   headerBackBtn: {
     position: 'absolute',
-    left: 14,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
     padding: 4,
+  },
+  headerBackText: {
+    fontSize: 12,
+    color: '#aaa',
+    fontWeight: '500',
   },
   headerTitle: {
     fontSize: 17,
