@@ -872,18 +872,17 @@ export default function Index() {
               placeholderTextColor="#666"
             />
           </View>
-        </View>
-        
-        <View style={styles.inputGroupFull}>
-          <Text style={styles.inputLabel}>Grosor de corte - Kerf (cm)</Text>
-          <TextInput
-            style={styles.input}
-            value={kerf}
-            onChangeText={setKerf}
-            keyboardType="numeric"
-            placeholder="0.3"
-            placeholderTextColor="#666"
-          />
+          <View style={styles.inputGroupSmall}>
+            <Text style={styles.inputLabel}>Kerf (cm)</Text>
+            <TextInput
+              style={styles.input}
+              value={kerf}
+              onChangeText={setKerf}
+              keyboardType="numeric"
+              placeholder="0.3"
+              placeholderTextColor="#666"
+            />
+          </View>
         </View>
       </View>
 
@@ -1960,6 +1959,12 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: 'row',
     gap: 10,
+  },
+  inputGroup: {
+    flex: 1,
+  },
+  inputGroupSmall: {
+    flex: 0.6,
   },
   inputGroup: {
     flex: 1,
