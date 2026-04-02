@@ -128,6 +128,7 @@ const getGlobalDimensionColorMap = (layouts: BoardLayout[]): Record<string, stri
 
 export default function Index() {
   // Board state
+  const [showWelcome, setShowWelcome] = useState(true);
   const [boardLength, setBoardLength] = useState('244');
   const [boardWidth, setBoardWidth] = useState('122');
   const [kerf, setKerf] = useState('0.3');
@@ -719,6 +720,7 @@ export default function Index() {
     setProjectName(project.name);
     setResult(null);
     setActiveTab('input');
+    setShowWelcome(false);
   };
 
   const deleteProject = async (projectId: string) => {
@@ -1298,13 +1300,90 @@ export default function Index() {
     </View>
   );
 
+  // Welcome screen
+  const renderWelcomeScreen = () => (
+    <View style={styles.welcomeContainer}>
+      <View style={styles.welcomeHeader}>
+        <Ionicons name="cut-outline" size={48} color="#4CAF50" />
+        <Text style={styles.welcomeTitle}>Optimizador{'\n'}de Corte</Text>
+        <Text style={styles.welcomeSubtitle}>Calcula el despiece óptimo de tus tableros</Text>
+      </View>
+
+      <Text style={styles.welcomeQuestion}>¿Qué quieres hacer?</Text>
+
+      <TouchableOpacity
+        style={styles.welcomeCard}
+        onPress={() => {
+          setShowWelcome(false);
+          setActiveTab('input');
+        }}
+      >
+        <View style={styles.welcomeCardIcon}>
+          <Ionicons name="create-outline" size={32} color="#4CAF50" />
+        </View>
+        <View style={styles.welcomeCardContent}>
+          <Text style={styles.welcomeCardTitle}>Despiece manual</Text>
+          <Text style={styles.welcomeCardDesc}>Añade piezas una a una con sus medidas</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={24} color="#555" />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.welcomeCard}
+        onPress={() => {
+          setShowWelcome(false);
+          setActiveTab('input');
+          setTimeout(() => setTemplateVisible(true), 300);
+        }}
+      >
+        <View style={[styles.welcomeCardIcon, { backgroundColor: '#1a2a3a' }]}>
+          <Ionicons name="cube-outline" size={32} color="#2196F3" />
+        </View>
+        <View style={styles.welcomeCardContent}>
+          <Text style={styles.welcomeCardTitle}>Plantilla de mueble</Text>
+          <Text style={styles.welcomeCardDesc}>Armario, estantería, cajonera o mesa</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={24} color="#555" />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.welcomeCard}
+        onPress={() => {
+          setShowWelcome(false);
+          setActiveTab('projects');
+        }}
+      >
+        <View style={[styles.welcomeCardIcon, { backgroundColor: '#2a2a1a' }]}>
+          <Ionicons name="folder-open-outline" size={32} color="#FFC107" />
+        </View>
+        <View style={styles.welcomeCardContent}>
+          <Text style={styles.welcomeCardTitle}>Abrir proyecto</Text>
+          <Text style={styles.welcomeCardDesc}>Continuar con un proyecto guardado</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={24} color="#555" />
+      </TouchableOpacity>
+    </View>
+  );
+
+  if (showWelcome) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        {renderWelcomeScreen()}
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
       
-      {/* Header */}
+      {/* Header with back button */}
       <View style={styles.header}>
-        <Ionicons name="cut-outline" size={28} color="#4CAF50" />
+        <TouchableOpacity onPress={() => setShowWelcome(true)} style={styles.headerBackBtn}>
+          <Ionicons name="home-outline" size={22} color="#888" />
+        </TouchableOpacity>
+        <Ionicons name="cut-outline" size={24} color="#4CAF50" />
         <Text style={styles.headerTitle}>Optimizador de Corte</Text>
       </View>
 
@@ -1743,10 +1822,77 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#2a2a2a',
   },
+  headerBackBtn: {
+    position: 'absolute',
+    left: 14,
+    padding: 4,
+  },
   headerTitle: {
-    fontSize: 19,
+    fontSize: 17,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  // Welcome screen styles
+  welcomeContainer: {
+    flex: 1,
+    paddingHorizontal: 24,
+    justifyContent: 'center',
+  },
+  welcomeHeader: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  welcomeTitle: {
+    fontSize: 30,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+    marginTop: 12,
+    lineHeight: 36,
+  },
+  welcomeSubtitle: {
+    fontSize: 14,
+    color: '#888',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  welcomeQuestion: {
+    fontSize: 16,
+    color: '#aaa',
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  welcomeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1e1e1e',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+  },
+  welcomeCardIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 14,
+    backgroundColor: '#1a2a1a',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  welcomeCardContent: {
+    flex: 1,
+  },
+  welcomeCardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 3,
+  },
+  welcomeCardDesc: {
+    fontSize: 12,
+    color: '#888',
   },
   tabContainer: {
     flexDirection: 'row',
