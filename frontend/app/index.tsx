@@ -852,6 +852,21 @@ export default function Index() {
           <Ionicons name="cube-outline" size={22} color="#4CAF50" />
           <Text style={styles.sectionTitle}>Tablero</Text>
         </View>
+
+        <View style={styles.boardPresetRow}>
+          <TouchableOpacity
+            style={[styles.boardPresetBtn, boardLength === '244' && boardWidth === '122' && styles.boardPresetBtnActive]}
+            onPress={() => { setBoardLength('244'); setBoardWidth('122'); }}
+          >
+            <Text style={[styles.boardPresetText, boardLength === '244' && boardWidth === '122' && styles.boardPresetTextActive]}>244 x 122</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.boardPresetBtn, boardLength === '280' && boardWidth === '207' && styles.boardPresetBtnActive]}
+            onPress={() => { setBoardLength('280'); setBoardWidth('207'); }}
+          >
+            <Text style={[styles.boardPresetText, boardLength === '280' && boardWidth === '207' && styles.boardPresetTextActive]}>280 x 207</Text>
+          </TouchableOpacity>
+        </View>
         
         <View style={styles.inputRow}>
           <View style={styles.inputGroup}>
@@ -2004,6 +2019,31 @@ const styles = StyleSheet.create({
   },
   inputGroupSmall: {
     flex: 0.6,
+  },
+  boardPresetRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 8,
+  },
+  boardPresetBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#2a2a2a',
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+  },
+  boardPresetBtnActive: {
+    backgroundColor: '#4CAF50',
+    borderColor: '#4CAF50',
+  },
+  boardPresetText: {
+    fontSize: 12,
+    color: '#888',
+    fontWeight: '600',
+  },
+  boardPresetTextActive: {
+    color: '#fff',
   },
   inputGroup: {
     flex: 1,
