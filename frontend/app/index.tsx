@@ -1303,7 +1303,7 @@ export default function Index() {
   const renderWelcomeScreen = () => (
     <View style={styles.welcomeContainer}>
       <View style={styles.welcomeHeader}>
-        <Ionicons name="cut-outline" size={48} color="#4CAF50" />
+        <Ionicons name="cog" size={48} color="#FFC107" />
         <Text style={styles.welcomeTitle}>Optimizador{'\n'}de Corte</Text>
         <Text style={styles.welcomeSubtitle}>Calcula el despiece óptimo de tus tableros</Text>
       </View>
@@ -1382,7 +1382,7 @@ export default function Index() {
         <TouchableOpacity onPress={() => setShowWelcome(true)} style={styles.headerBackBtn}>
           <Ionicons name="home-outline" size={22} color="#888" />
         </TouchableOpacity>
-        <Ionicons name="cut-outline" size={24} color="#4CAF50" />
+        <Ionicons name="cog" size={24} color="#FFC107" />
         <Text style={styles.headerTitle}>Optimizador de Corte</Text>
       </View>
 
@@ -1609,7 +1609,10 @@ export default function Index() {
                   <Text style={[styles.presetBtnText, templateGrosor === v && styles.presetBtnTextActive]}>{v}</Text>
                 </TouchableOpacity>
               ))}
-              <TextInput style={styles.presetInput} value={templateGrosor} onChangeText={setTemplateGrosor} keyboardType="decimal-pad" placeholderTextColor="#555" />
+              <View style={styles.presetInputWrap}>
+                <Text style={styles.presetInputLabel}>Otro:</Text>
+                <TextInput style={styles.presetInputSmall} value={templateGrosor} onChangeText={(t) => { setTemplateGrosor(t); }} keyboardType="decimal-pad" placeholderTextColor="#555" />
+              </View>
             </View>
 
             {/* Grosor trasera con presets */}
@@ -1626,7 +1629,10 @@ export default function Index() {
                       <Text style={[styles.presetBtnText, templateGrosorTrasera === v && styles.presetBtnTextActive]}>{v}</Text>
                     </TouchableOpacity>
                   ))}
-                  <TextInput style={styles.presetInput} value={templateGrosorTrasera} onChangeText={setTemplateGrosorTrasera} keyboardType="decimal-pad" placeholderTextColor="#555" />
+                  <View style={styles.presetInputWrap}>
+                    <Text style={styles.presetInputLabel}>Otro:</Text>
+                    <TextInput style={styles.presetInputSmall} value={templateGrosorTrasera} onChangeText={(t) => { setTemplateGrosorTrasera(t); }} keyboardType="decimal-pad" placeholderTextColor="#555" />
+                  </View>
                 </View>
               </>
             )}
@@ -2968,10 +2974,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     marginBottom: 12,
+    flexWrap: 'nowrap',
   },
   presetBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 6,
     backgroundColor: '#2a2a2a',
     borderWidth: 1,
@@ -2988,6 +2995,28 @@ const styles = StyleSheet.create({
   },
   presetBtnTextActive: {
     color: '#fff',
+  },
+  presetInputWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  presetInputLabel: {
+    fontSize: 11,
+    color: '#666',
+  },
+  presetInputSmall: {
+    flex: 1,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    fontSize: 13,
+    color: '#fff',
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+    textAlign: 'center',
   },
   presetInput: {
     flex: 1,
