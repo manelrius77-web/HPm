@@ -76,10 +76,15 @@ agenthub/agents/youtube/db
 # Build caches
 .cache/
 
+backend/.env
+frontend/.env
+.metro-cache/
+.expo/
+.env
 memory/test_credentials.md
 
 # Mobile development
-android-sdk/-e 
+
 # Environment files
 *.env
 *.env.*

@@ -22,7 +22,10 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+ // mrc const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+//const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+// mrc
+const BACKEND_URL = 'http://localhost:8001';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Types
@@ -1422,7 +1425,7 @@ export default function Index() {
           <Ionicons name="arrow-back" size={20} color="#fff" />
           <Text style={styles.headerBackText}>Salir</Text>
         </TouchableOpacity>
-        <Ionicons name="cog" size={24} color="#FFC107" />
+        <Ionicons name="cog" size={24} color="#bce213" />
         <Text style={styles.headerTitle}>Optimizador de Corte</Text>
       </View>
 
@@ -1435,7 +1438,7 @@ export default function Index() {
           <Ionicons 
             name="create-outline" 
             size={20} 
-            color={activeTab === 'input' ? '#4CAF50' : '#888'} 
+            color={activeTab === 'input' ? '#250ed2' : '#888'} 
           />
           <Text style={[styles.tabText, activeTab === 'input' && styles.activeTabText]}>
             Entrada
